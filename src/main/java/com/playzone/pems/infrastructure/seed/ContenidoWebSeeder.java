@@ -1,7 +1,9 @@
 package com.playzone.pems.infrastructure.seed;
 
 import com.playzone.pems.domain.cms.model.ContenidoWeb;
+import com.playzone.pems.domain.cms.model.SeccionWeb;
 import com.playzone.pems.domain.cms.repository.ContenidoWebRepository;
+import com.playzone.pems.domain.cms.repository.SeccionWebRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -16,10 +18,15 @@ import org.springframework.stereotype.Component;
 public class ContenidoWebSeeder implements ApplicationRunner {
 
     private final ContenidoWebRepository contenidoRepository;
+    private final SeccionWebRepository   seccionRepository;
 
     @Override
     public void run(ApplicationArguments args) {
         int orden = 0;
+
+        sembrarSeccion("HOME", "Página principal", "Contenido principal del home", 1);
+        sembrarSeccion("NOSOTROS", "Nosotros", "Contenido institucional", 5);
+        sembrarSeccion("ZONA_JUEGOS", "Zona de juegos", "Contenido de la zona de juegos", 10);
 
         sembrar("HOME", "home.hero.badge",
                 "El local más divertido de Chiclayo", orden++);
@@ -86,6 +93,23 @@ public class ContenidoWebSeeder implements ApplicationRunner {
             log.info("Contenido web sembrado: {}/{}", seccion, clave);
         } catch (Exception e) {
             log.warn("No se pudo sembrar contenido {}/{}: {}", seccion, clave, e.getMessage());
+        }
+    }
+
+    private void sembrarSeccion(String codigo, String nombre, String descripcion, int orden) {
+        try {
+            if (seccionRepository.existsByCodigo(codigo)) return;
+            seccionRepository.save(SeccionWeb.builder()
+                    .codigo(codigo)
+                    .nombre(nombre)
+                    .descripcion(descripcion)
+                    .esSistema(true)
+                    .activo(true)
+                    .orden(orden)
+                    .build());
+            log.info("Sección web sembrada: {}", codigo);
+        } catch (Exception e) {
+            log.warn("No se pudo sembrar sección web {}: {}", codigo, e.getMessage());
         }
     }
 }
