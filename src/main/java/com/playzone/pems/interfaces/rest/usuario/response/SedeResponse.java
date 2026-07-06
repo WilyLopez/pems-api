@@ -15,6 +15,7 @@ public class SedeResponse {
     private String         ruc;
     private Double         latitud;
     private Double         longitud;
+    private String         googleMapsEmbedUrl;
     private boolean        activo;
     private OffsetDateTime fechaCreacion;
 }

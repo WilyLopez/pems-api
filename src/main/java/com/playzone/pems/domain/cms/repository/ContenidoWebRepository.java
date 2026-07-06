@@ -18,6 +18,8 @@ public interface ContenidoWebRepository {
 
     List<ContenidoWeb> findAllActivos();
 
+    List<ContenidoWeb> findVisibles();
+
     Page<ContenidoWeb> findAll(String seccionCodigo, String clave, Pageable pageable);
 
     ContenidoWeb save(ContenidoWeb contenido);

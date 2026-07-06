@@ -2,7 +2,9 @@ package com.playzone.pems.infrastructure.persistence.cms.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -47,9 +49,10 @@ public class ContenidoWebEntity {
     @Column(name = "es_visible", nullable = false)
     private boolean visible;
 
-    @Column(name = "version_v", nullable = false)
+    @Column(name = "version", nullable = false)
     private int version;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadatos", columnDefinition = "jsonb")
     private String metadatos;
 

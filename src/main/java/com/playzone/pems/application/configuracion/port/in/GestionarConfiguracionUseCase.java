@@ -10,4 +10,6 @@ public interface GestionarConfiguracionUseCase {
     List<ConfiguracionGlobal> listar();
 
     List<ConfiguracionGlobal> actualizar(Map<String, String> cambios);
+
+    Map<String, String> obtenerPublicas();
 }

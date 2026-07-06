@@ -18,6 +18,9 @@ public class ConfiguracionPublica {
 
     private String        logoPath;
     private String        faviconPath;
+    private String        logoSecundarioPath;
+    private String        mascota1Path;
+    private String        mascota2Path;
 
     private String        telefono;
     private String        telefonoSecundario;
@@ -27,36 +30,14 @@ public class ConfiguracionPublica {
     private String        correo;
     private String        correoSecundario;
 
-    private String        direccion;
-
     private String        facebookUrl;
     private String        instagramUrl;
     private String        tiktokUrl;
     private String        youtubeUrl;
 
-    private String        googleMapsUrl;
-
-    private String        horarioSemana;
-    private String        horarioFinSemana;
-
     private String        copyrightTexto;
 
-    private String        metaTitle;
-    private String        metaDescription;
-    private String        metaKeywords;
-
-    private String        openGraphTitle;
-    private String        openGraphDescription;
-    private String        openGraphImagePath;
-
-    private String        googleAnalyticsId;
-    private String        metaPixelId;
-
-    private String        colorTema;
-    private String        colorSecundario;
-
     private String        metricasNegocio;
-    private String        reglasLocal;
 
     private boolean       esMantenimientoActivo;
     private String        mensajeMantenimiento;

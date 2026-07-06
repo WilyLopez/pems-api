@@ -3,7 +3,9 @@ package com.playzone.pems.infrastructure.persistence.cms.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -34,6 +36,15 @@ public class ConfiguracionPublicaEntity {
     @Column(name = "favicon_path")
     private String faviconPath;
 
+    @Column(name = "logo_secundario_path")
+    private String logoSecundarioPath;
+
+    @Column(name = "mascota_1_path")
+    private String mascota1Path;
+
+    @Column(name = "mascota_2_path")
+    private String mascota2Path;
+
     @Column(name = "telefono")
     private String telefono;
 
@@ -49,9 +60,6 @@ public class ConfiguracionPublicaEntity {
     @Column(name = "correo_secundario")
     private String correoSecundario;
 
-    @Column(name = "direccion")
-    private String direccion;
-
     @Column(name = "facebook_url")
     private String facebookUrl;
 
@@ -64,50 +72,9 @@ public class ConfiguracionPublicaEntity {
     @Column(name = "youtube_url")
     private String youtubeUrl;
 
-    @Column(name = "google_maps_url")
-    private String googleMapsUrl;
-
-    @Column(name = "horario_semana")
-    private String horarioSemana;
-
-    @Column(name = "horario_fin_semana")
-    private String horarioFinSemana;
-
-    @Column(name = "meta_title")
-    private String metaTitle;
-
-    @Column(name = "meta_description")
-    private String metaDescription;
-
-    @Column(name = "meta_keywords")
-    private String metaKeywords;
-
-    @Column(name = "open_graph_title")
-    private String openGraphTitle;
-
-    @Column(name = "open_graph_description")
-    private String openGraphDescription;
-
-    @Column(name = "open_graph_image_path")
-    private String openGraphImagePath;
-
-    @Column(name = "google_analytics_id")
-    private String googleAnalyticsId;
-
-    @Column(name = "meta_pixel_id")
-    private String metaPixelId;
-
-    @Column(name = "color_primario")
-    private String colorTema;
-
-    @Column(name = "color_secundario")
-    private String colorSecundario;
-
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metricas_negocio", columnDefinition = "jsonb")
     private String metricasNegocio;
-
-    @Column(name = "reglas_local", columnDefinition = "jsonb")
-    private String reglasLocal;
 
     @Column(name = "es_mantenimiento_activo", nullable = false)
     private boolean esMantenimientoActivo;

@@ -45,6 +45,7 @@ public class SedeService implements GestionarSedeUseCase {
                 .ruc(command.ruc())
                 .latitud(command.latitud())
                 .longitud(command.longitud())
+                .googleMapsEmbedUrl(command.googleMapsEmbedUrl())
                 .build());
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(

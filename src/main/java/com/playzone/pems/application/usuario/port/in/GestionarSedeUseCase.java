@@ -12,7 +12,8 @@ public interface GestionarSedeUseCase {
             String departamento,
             String ruc,
             Double latitud,
-            Double longitud
+            Double longitud,
+            String googleMapsEmbedUrl
     ) {}
 
     List<Sede> listar();

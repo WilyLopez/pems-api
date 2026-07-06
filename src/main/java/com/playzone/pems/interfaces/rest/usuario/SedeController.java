@@ -48,7 +48,8 @@ public class SedeController {
                         request.getDepartamento(),
                         request.getRuc(),
                         request.getLatitud(),
-                        request.getLongitud()));
+                        request.getLongitud(),
+                        request.getGoogleMapsEmbedUrl()));
 
         return ResponseEntity.ok(ApiResponse.ok(toResponse(sede)));
     }
@@ -62,6 +63,7 @@ public class SedeController {
                 .ruc(s.getRuc())
                 .latitud(s.getLatitud())
                 .longitud(s.getLongitud())
+                .googleMapsEmbedUrl(s.getGoogleMapsEmbedUrl())
                 .activo(s.getDeletedAt() == null)
                 .fechaCreacion(s.getFechaCreacion())
                 .build();
@@ -75,5 +77,6 @@ public class SedeController {
         @Size(max = 11)            private String  ruc;
         private Double latitud;
         private Double longitud;
+        private String googleMapsEmbedUrl;
     }
 }

@@ -50,6 +50,7 @@ public class SecurityConfig {
                                 "/api/v1/galeria/**",
                                 "/api/v1/cms/**",
                                 "/api/v1/contenido/**",
+                                "/api/v1/configuracion/publica",
                                 "/api/v1/resenas/**",
                                 "/api/v1/promociones/**",
                                 "/api/v1/actividades/**",

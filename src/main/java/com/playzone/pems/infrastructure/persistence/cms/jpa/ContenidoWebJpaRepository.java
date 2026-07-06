@@ -18,6 +18,8 @@ public interface ContenidoWebJpaRepository extends JpaRepository<ContenidoWebEnt
 
     List<ContenidoWebEntity> findByDeletedAtIsNull();
 
+    List<ContenidoWebEntity> findByVisibleTrueAndDeletedAtIsNull();
+
     @Query("SELECT c FROM ContenidoWebEntity c " +
            "WHERE (:seccionCodigo IS NULL OR c.seccionCodigo = :seccionCodigo) " +
            "AND (:clavePattern IS NULL OR LOWER(c.clave) LIKE :clavePattern)")

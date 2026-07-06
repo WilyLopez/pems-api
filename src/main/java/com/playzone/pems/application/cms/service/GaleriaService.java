@@ -1,5 +1,7 @@
 package com.playzone.pems.application.cms.service;
 
+import com.playzone.pems.application.auditoria.AuditoriaConstants;
+import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.cms.port.in.GestionarGaleriaUseCase;
 import com.playzone.pems.domain.cms.model.ImagenGaleria;
 import com.playzone.pems.domain.cms.model.enums.CategoriaImagen;
@@ -23,13 +25,16 @@ public class GaleriaService implements GestionarGaleriaUseCase {
 
     private final ImagenGaleriaRepository galeriaRepository;
     private final StoragePort             storagePort;
+    private final RegistrarLogUseCase     auditoria;
     private final String                  bucketPublico;
 
     public GaleriaService(ImagenGaleriaRepository galeriaRepository,
                           StoragePort storagePort,
+                          RegistrarLogUseCase auditoria,
                           @Value("${supabase.storage.bucket-publico}") String bucketPublico) {
         this.galeriaRepository = galeriaRepository;
         this.storagePort = storagePort;
+        this.auditoria = auditoria;
         this.bucketPublico = bucketPublico;
     }
 
@@ -52,23 +57,38 @@ public class GaleriaService implements GestionarGaleriaUseCase {
         String key = "galeria/" + LocalDateTime.now().format(FMT) + "_" + nombreArchivo;
         String url = storagePort.upload(bucketPublico, key, contenido, contentType);
 
-        ImagenGaleria imagen = ImagenGaleria.builder()
-                .idSede(idSede)
-                .urlImagen(url)
-                .titulo(titulo)
-                .descripcion(descripcion)
-                .altTexto(altTexto)
-                .categoriaImagen(categoria)
-                .tipoMime(contentType)
-                .tamanioBytes((long) contenido.length)
-                .ordenVisualizacion(orden)
-                .activo(true)
-                .destacada(false)
-                .eliminada(false)
-                .idUsuarioSubio(idUsuario)
-                .build();
+        try {
+            ImagenGaleria imagen = ImagenGaleria.builder()
+                    .idSede(idSede)
+                    .urlImagen(url)
+                    .titulo(titulo)
+                    .descripcion(descripcion)
+                    .altTexto(altTexto)
+                    .categoriaImagen(categoria)
+                    .tipoMime(contentType)
+                    .tamanioBytes((long) contenido.length)
+                    .ordenVisualizacion(orden)
+                    .activo(true)
+                    .destacada(false)
+                    .eliminada(false)
+                    .idUsuarioSubio(idUsuario)
+                    .build();
 
-        return galeriaRepository.save(imagen);
+            ImagenGaleria guardada = galeriaRepository.save(imagen);
+
+            auditoria.ejecutar(new RegistrarLogUseCase.Command(
+                    idUsuario,
+                    AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_CMS,
+                    "ImagenGaleria", guardada.getId(),
+                    null, guardada.getTitulo() != null ? guardada.getTitulo() : nombreArchivo,
+                    "Imagen de galería subida",
+                    null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+
+            return guardada;
+        } catch (RuntimeException e) {
+            storagePort.deleteByUrl(url);
+            throw e;
+        }
     }
 
     @Override

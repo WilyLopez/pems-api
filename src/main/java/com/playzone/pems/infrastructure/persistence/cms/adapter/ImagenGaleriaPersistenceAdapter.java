@@ -3,6 +3,7 @@ package com.playzone.pems.infrastructure.persistence.cms.adapter;
 import com.playzone.pems.domain.cms.model.ImagenGaleria;
 import com.playzone.pems.domain.cms.model.enums.CategoriaImagen;
 import com.playzone.pems.domain.cms.repository.ImagenGaleriaRepository;
+import com.playzone.pems.infrastructure.persistence.cms.entity.ImagenGaleriaEntity;
 import com.playzone.pems.infrastructure.persistence.cms.jpa.ImagenGaleriaJpaRepository;
 import com.playzone.pems.infrastructure.persistence.cms.mapper.CmsEntityMapper;
 import com.playzone.pems.infrastructure.persistence.usuario.jpa.SedeJpaRepository;
@@ -41,17 +42,25 @@ public class ImagenGaleriaPersistenceAdapter implements ImagenGaleriaRepository 
 
     @Override
     public Page<ImagenGaleria> findBySede(Long idSede, Pageable pageable) {
-        return jpaRepository.findBySede_Id(idSede, pageable).map(mapper::toDomain);
+        Page<ImagenGaleriaEntity> pagina = idSede == null
+                ? jpaRepository.findAll(pageable)
+                : jpaRepository.findBySede_Id(idSede, pageable);
+        return pagina.map(mapper::toDomain);
     }
 
     @Override
     public Page<ImagenGaleria> findBySedeAndDestacada(Long idSede, boolean destacada, Pageable pageable) {
-        return jpaRepository.findBySede_IdAndDestacada(idSede, destacada, pageable).map(mapper::toDomain);
+        Page<ImagenGaleriaEntity> pagina = idSede == null
+                ? jpaRepository.findByDestacada(destacada, pageable)
+                : jpaRepository.findBySede_IdAndDestacada(idSede, destacada, pageable);
+        return pagina.map(mapper::toDomain);
     }
 
     @Override
     public ImagenGaleria save(ImagenGaleria imagen) {
-        var sedeEntity = sedeRepository.getReferenceById(imagen.getIdSede());
+        var sedeEntity = imagen.getIdSede() != null
+                ? sedeRepository.findById(imagen.getIdSede()).orElse(null)
+                : sedeRepository.findFirstByDeletedAtIsNullOrderByIdAsc().orElse(null);
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(imagen, sedeEntity)));
     }
 

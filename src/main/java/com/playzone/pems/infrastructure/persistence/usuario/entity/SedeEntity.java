@@ -38,6 +38,9 @@ public class SedeEntity {
     @Column(name = "longitud")
     private Double longitud;
 
+    @Column(name = "google_maps_embed_url")
+    private String googleMapsEmbedUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

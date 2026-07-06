@@ -42,6 +42,12 @@ public class ContenidoWebPersistenceAdapter implements ContenidoWebRepository {
     }
 
     @Override
+    public List<ContenidoWeb> findVisibles() {
+        return contenidoJpa.findByVisibleTrueAndDeletedAtIsNull()
+                .stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public Page<ContenidoWeb> findAll(String seccionCodigo, String clave, Pageable pageable) {
         String clavePattern = (clave != null && !clave.isBlank())
                 ? "%" + clave.toLowerCase() + "%"
