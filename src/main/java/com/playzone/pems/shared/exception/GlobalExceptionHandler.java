@@ -71,6 +71,8 @@ public class GlobalExceptionHandler {
         todos.addAll(erroresCampo);
         todos.addAll(erroresGlobal);
 
+        log.warn("Error de validación de argumentos en {}: {}", request.getRequestURI(), todos);
+
         ErrorResponse error = ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
@@ -100,6 +102,8 @@ public class GlobalExceptionHandler {
                     .map(msg -> ErrorResponse.CampoError.builder().mensaje(msg).build())
                     .toList();
         }
+
+        log.warn("Error de validación de negocio en {}: {}", request.getRequestURI(), ex.getMessage());
 
         ErrorResponse error = ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
