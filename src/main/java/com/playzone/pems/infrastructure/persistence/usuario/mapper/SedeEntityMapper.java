@@ -19,6 +19,7 @@ public class SedeEntityMapper {
                 .ruc(e.getRuc())
                 .latitud(e.getLatitud())
                 .longitud(e.getLongitud())
+                .googleMapsEmbedUrl(e.getGoogleMapsEmbedUrl())
                 .fechaCreacion(e.getCreatedAt() != null ? e.getCreatedAt() : null)
                 .deletedAt(e.getDeletedAt() != null ? e.getDeletedAt() : null)
                 .build();
@@ -34,6 +35,7 @@ public class SedeEntityMapper {
                 .ruc(d.getRuc())
                 .latitud(d.getLatitud())
                 .longitud(d.getLongitud())
+                .googleMapsEmbedUrl(d.getGoogleMapsEmbedUrl())
                 .build();
     }
 

@@ -19,6 +19,8 @@ public class Sede {
     private Double        latitud;
     private Double        longitud;
 
+    private String        googleMapsEmbedUrl;
+
     private OffsetDateTime fechaCreacion;
     private OffsetDateTime deletedAt;
 

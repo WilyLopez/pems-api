@@ -17,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/contenido")
 @RequiredArgsConstructor
@@ -34,6 +36,13 @@ public class ContenidoWebController {
             @PageableDefault(size = 50) Pageable pageable) {
         var page = consultarUseCase.listar(seccionCodigo, clave, pageable);
         return ResponseEntity.ok(ApiResponse.ok(PagedResponse.of(page.map(this::toResponse))));
+    }
+
+    @GetMapping("/publico")
+    public ResponseEntity<ApiResponse<List<ContenidoWebResponse>>> listarPublico() {
+        List<ContenidoWebResponse> contenido = consultarUseCase.listarPublico()
+                .stream().map(this::toResponse).toList();
+        return ResponseEntity.ok(ApiResponse.ok(contenido));
     }
 
     @PutMapping("/{idContenido}")

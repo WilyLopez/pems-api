@@ -14,10 +14,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ConfiguracionGlobalService implements GestionarConfiguracionUseCase {
+
+    private static final Set<String> CLAVES_PUBLICAS = Set.of(
+            "EDAD_MIN_NINO", "EDAD_MAX_NINO");
 
     private final ConfiguracionGlobalRepository configuracionRepository;
     private final SupabaseAuthFacade            authFacade;
@@ -26,6 +31,15 @@ public class ConfiguracionGlobalService implements GestionarConfiguracionUseCase
     @Override
     public List<ConfiguracionGlobal> listar() {
         return configuracionRepository.findAll();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, String> obtenerPublicas() {
+        return configuracionRepository.findAll().stream()
+                .filter(c -> CLAVES_PUBLICAS.contains(c.getClave()))
+                .collect(Collectors.toMap(
+                        ConfiguracionGlobal::getClave, ConfiguracionGlobal::getValor));
     }
 
     @Override

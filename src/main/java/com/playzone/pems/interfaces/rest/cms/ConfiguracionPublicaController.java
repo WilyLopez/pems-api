@@ -51,29 +51,17 @@ public class ConfiguracionPublicaController {
                         request.getWhatsapp(),
                         request.getCorreo(),
                         request.getCorreoSecundario(),
-                        request.getDireccion(),
                         request.getFacebookUrl(),
                         request.getInstagramUrl(),
                         request.getTiktokUrl(),
                         request.getYoutubeUrl(),
-                        request.getGoogleMapsUrl(),
-                        request.getHorarioSemana(),
-                        request.getHorarioFinDeSemana(),
                         request.getCopyrightTexto(),
-                        request.getMetaTitle(),
-                        request.getMetaDescription(),
-                        request.getMetaKeywords(),
-                        request.getOpenGraphTitle(),
-                        request.getOpenGraphDescription(),
-                        request.getOpenGraphImageUrl(),
-                        request.getGoogleAnalyticsId(),
-                        request.getMetaPixelId(),
-                        request.getColorTema(),
-                        request.getColorSecundario(),
                         request.getMetricasNegocio(),
-                        request.getReglasLocal(),
                         request.isMantenimientoActivo(),
-                        request.getMensajeMantenimiento())));
+                        request.getMensajeMantenimiento(),
+                        request.getLogoSecundarioUrl(),
+                        request.getMascota1Url(),
+                        request.getMascota2Url())));
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
@@ -84,32 +72,20 @@ public class ConfiguracionPublicaController {
         private String  slogan;
         private String  logoUrl;
         private String  faviconUrl;
+        private String  logoSecundarioUrl;
+        private String  mascota1Url;
+        private String  mascota2Url;
         private String  telefono;
         private String  telefonoSecundario;
         private String  whatsapp;
         private String  correo;
         private String  correoSecundario;
-        private String  direccion;
         private String  facebookUrl;
         private String  instagramUrl;
         private String  tiktokUrl;
         private String  youtubeUrl;
-        private String  googleMapsUrl;
-        private String  horarioSemana;
-        private String  horarioFinDeSemana;
         private String  copyrightTexto;
-        private String  metaTitle;
-        private String  metaDescription;
-        private String  metaKeywords;
-        private String  openGraphTitle;
-        private String  openGraphDescription;
-        private String  openGraphImageUrl;
-        private String  googleAnalyticsId;
-        private String  metaPixelId;
-        private String  colorTema;
-        private String  colorSecundario;
         private String  metricasNegocio;
-        private String  reglasLocal;
         private boolean mantenimientoActivo;
         private String  mensajeMantenimiento;
     }
@@ -121,32 +97,20 @@ public class ConfiguracionPublicaController {
         private String        slogan;
         private String        logoUrl;
         private String        faviconUrl;
+        private String        logoSecundarioUrl;
+        private String        mascota1Url;
+        private String        mascota2Url;
         private String        telefono;
         private String        telefonoSecundario;
         private String        whatsapp;
         private String        correo;
         private String        correoSecundario;
-        private String        direccion;
         private String        facebookUrl;
         private String        instagramUrl;
         private String        tiktokUrl;
         private String        youtubeUrl;
-        private String        googleMapsUrl;
-        private String        horarioSemana;
-        private String        horarioFinDeSemana;
         private String        copyrightTexto;
-        private String        metaTitle;
-        private String        metaDescription;
-        private String        metaKeywords;
-        private String        openGraphTitle;
-        private String        openGraphDescription;
-        private String        openGraphImageUrl;
-        private String        googleAnalyticsId;
-        private String        metaPixelId;
-        private String        colorTema;
-        private String        colorSecundario;
         private String        metricasNegocio;
-        private String        reglasLocal;
         private boolean       mantenimientoActivo;
         private String        mensajeMantenimiento;
         private OffsetDateTime updatedAt;
@@ -157,32 +121,20 @@ public class ConfiguracionPublicaController {
                     .slogan(q.getSlogan())
                     .logoUrl(q.getLogoPath())
                     .faviconUrl(q.getFaviconPath())
+                    .logoSecundarioUrl(q.getLogoSecundarioPath())
+                    .mascota1Url(q.getMascota1Path())
+                    .mascota2Url(q.getMascota2Path())
                     .telefono(q.getTelefono())
                     .telefonoSecundario(q.getTelefonoSecundario())
                     .whatsapp(q.getWhatsapp())
                     .correo(q.getCorreo())
                     .correoSecundario(q.getCorreoSecundario())
-                    .direccion(q.getDireccion())
                     .facebookUrl(q.getFacebookUrl())
                     .instagramUrl(q.getInstagramUrl())
                     .tiktokUrl(q.getTiktokUrl())
                     .youtubeUrl(q.getYoutubeUrl())
-                    .googleMapsUrl(q.getGoogleMapsUrl())
-                    .horarioSemana(q.getHorarioSemana())
-                    .horarioFinDeSemana(q.getHorarioFinSemana())
                     .copyrightTexto(q.getCopyrightTexto())
-                    .metaTitle(q.getMetaTitle())
-                    .metaDescription(q.getMetaDescription())
-                    .metaKeywords(q.getMetaKeywords())
-                    .openGraphTitle(q.getOpenGraphTitle())
-                    .openGraphDescription(q.getOpenGraphDescription())
-                    .openGraphImageUrl(q.getOpenGraphImagePath())
-                    .googleAnalyticsId(q.getGoogleAnalyticsId())
-                    .metaPixelId(q.getMetaPixelId())
-                    .colorTema(q.getColorTema())
-                    .colorSecundario(q.getColorSecundario())
                     .metricasNegocio(q.getMetricasNegocio())
-                    .reglasLocal(q.getReglasLocal())
                     .mantenimientoActivo(q.isEsMantenimientoActivo())
                     .mensajeMantenimiento(q.getMensajeMantenimiento())
                     .updatedAt(q.getUpdatedAt())

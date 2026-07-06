@@ -15,29 +15,17 @@ public interface GestionarConfiguracionPublicaUseCase {
             String whatsapp,
             String correo,
             String correoSecundario,
-            String direccion,
             String facebookUrl,
             String instagramUrl,
             String tiktokUrl,
             String youtubeUrl,
-            String googleMapsUrl,
-            String horarioSemana,
-            String horarioFinDeSemana,
             String copyrightTexto,
-            String metaTitle,
-            String metaDescription,
-            String metaKeywords,
-            String openGraphTitle,
-            String openGraphDescription,
-            String openGraphImageUrl,
-            String googleAnalyticsId,
-            String metaPixelId,
-            String colorTema,
-            String colorSecundario,
             String metricasNegocio,
-            String reglasLocal,
             boolean mantenimientoActivo,
-            String mensajeMantenimiento
+            String mensajeMantenimiento,
+            String logoSecundarioUrl,
+            String mascota1Url,
+            String mascota2Url
     ) {}
 
     ConfiguracionPublicaQuery obtener();

@@ -19,6 +19,11 @@ public class ConfiguracionController {
 
     private final GestionarConfiguracionUseCase gestionarUseCase;
 
+    @GetMapping("/publica")
+    public ResponseEntity<ApiResponse<Map<String, String>>> obtenerPublicas() {
+        return ResponseEntity.ok(ApiResponse.ok(gestionarUseCase.obtenerPublicas()));
+    }
+
     @GetMapping
     @PreAuthorize("hasAuthority('configuracion.editar')")
     public ResponseEntity<ApiResponse<List<ConfiguracionResponse>>> listar() {

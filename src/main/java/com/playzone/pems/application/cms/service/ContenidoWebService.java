@@ -13,6 +13,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ContenidoWebService implements EditarContenidoWebUseCase, ConsultarContenidoWebUseCase {
@@ -26,14 +28,22 @@ public class ContenidoWebService implements EditarContenidoWebUseCase, Consultar
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ContenidoWebQuery> listarPublico() {
+        return contenidoRepository.findVisibles().stream().map(this::toQuery).toList();
+    }
+
+    @Override
     @Transactional
     public ContenidoWebQuery ejecutar(EditarContenidoCommand command) {
         ContenidoWeb contenido = contenidoRepository.findById(command.getIdContenido())
                 .orElseThrow(() -> new ContenidoNotFoundException(command.getIdContenido()));
 
         ContenidoWeb actualizado = contenido.toBuilder()
-                .valorEs(command.getValorEs())
-                .valorEn(command.getValorEn())
+                .valorEs(command.getValorEs() != null
+                        ? command.getValorEs() : contenido.getValorEs())
+                .valorEn(command.getValorEn() != null
+                        ? command.getValorEn() : contenido.getValorEn())
                 .imagenUrl(command.getImagenUrl() != null
                         ? command.getImagenUrl() : contenido.getImagenUrl())
                 .descripcion(command.getDescripcion() != null
