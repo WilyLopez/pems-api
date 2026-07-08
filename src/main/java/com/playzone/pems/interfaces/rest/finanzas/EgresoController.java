@@ -4,6 +4,7 @@ import com.playzone.pems.application.finanzas.dto.command.ActualizarEgresoComman
 import com.playzone.pems.application.finanzas.dto.command.RegistrarEgresoCommand;
 import com.playzone.pems.application.finanzas.dto.query.RegistroEgresoQuery;
 import com.playzone.pems.application.finanzas.port.in.RegistrarEgresoUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarEgresoRequest;
 import com.playzone.pems.interfaces.rest.finanzas.response.RegistroEgresoResponse;
@@ -32,12 +33,14 @@ public class EgresoController {
 
     private final RegistrarEgresoUseCase useCase;
     private final SupabaseAuthFacade     supabaseAuthFacade;
+    private final SedeScopeValidator     sedeScope;
 
     @GetMapping("/sedes/{idSede}")
     @PreAuthorize("hasAuthority('egreso.ver')")
     public ResponseEntity<ApiResponse<PagedResponse<RegistroEgresoResponse>>> listar(
             @PathVariable Long idSede,
             @PageableDefault(size = 20) Pageable pageable) {
+        sedeScope.validarAcceso(idSede);
         PagedResponse<RegistroEgresoResponse> body = PagedResponse.of(
                 useCase.listar(idSede, pageable).map(this::toResponse));
         return ResponseEntity.ok(ApiResponse.ok(body));
@@ -49,6 +52,7 @@ public class EgresoController {
             @PathVariable Long idSede,
             @RequestParam int anio,
             @RequestParam int mes) {
+        sedeScope.validarAcceso(idSede);
         List<RegistroEgresoResponse> body = useCase.listarPorPeriodo(idSede, anio, mes)
                 .stream().map(this::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.ok(body));
@@ -60,6 +64,7 @@ public class EgresoController {
             @PathVariable Long idSede,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        sedeScope.validarAcceso(idSede);
         if (inicio.isAfter(fin))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "inicio debe ser anterior o igual a fin");
         if (ChronoUnit.DAYS.between(inicio, fin) > 365)
@@ -74,6 +79,7 @@ public class EgresoController {
     public ResponseEntity<ApiResponse<RegistroEgresoResponse>> registrar(
             @PathVariable Long idSede,
             @Valid @RequestBody RegistrarEgresoRequest request) {
+        sedeScope.validarAcceso(idSede);
         RegistroEgresoQuery query = useCase.registrar(RegistrarEgresoCommand.builder()
                 .tipoEgresoCodigo(request.getTipoEgresoCodigo())
                 .idSede(idSede)

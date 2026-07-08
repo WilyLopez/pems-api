@@ -3,6 +3,7 @@ package com.playzone.pems.interfaces.rest.finanzas;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarIngresoManualCommand;
 import com.playzone.pems.application.finanzas.dto.query.RegistroIngresoQuery;
 import com.playzone.pems.application.finanzas.port.in.RegistrarIngresoUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarIngresoManualRequest;
 import com.playzone.pems.interfaces.rest.finanzas.response.RegistroIngresoResponse;
@@ -31,12 +32,14 @@ public class IngresoController {
 
     private final RegistrarIngresoUseCase useCase;
     private final SupabaseAuthFacade      supabaseAuthFacade;
+    private final SedeScopeValidator      sedeScope;
 
     @GetMapping("/sedes/{idSede}")
     @PreAuthorize("hasAuthority('ingreso.ver')")
     public ResponseEntity<ApiResponse<PagedResponse<RegistroIngresoResponse>>> listar(
             @PathVariable Long idSede,
             @PageableDefault(size = 20) Pageable pageable) {
+        sedeScope.validarAcceso(idSede);
         PagedResponse<RegistroIngresoResponse> body = PagedResponse.of(
                 useCase.listar(idSede, pageable).map(this::toResponse));
         return ResponseEntity.ok(ApiResponse.ok(body));
@@ -48,6 +51,7 @@ public class IngresoController {
             @PathVariable Long idSede,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        sedeScope.validarAcceso(idSede);
         if (inicio.isAfter(fin))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "inicio debe ser anterior o igual a fin");
         if (ChronoUnit.DAYS.between(inicio, fin) > 365)
@@ -62,6 +66,7 @@ public class IngresoController {
     public ResponseEntity<ApiResponse<RegistroIngresoResponse>> registrar(
             @PathVariable Long idSede,
             @Valid @RequestBody RegistrarIngresoManualRequest request) {
+        sedeScope.validarAcceso(idSede);
         RegistroIngresoQuery query = useCase.registrar(RegistrarIngresoManualCommand.builder()
                 .tipoIngresoCodigo(request.getTipoIngresoCodigo())
                 .idSede(idSede)
