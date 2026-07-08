@@ -15,7 +15,8 @@ import com.playzone.pems.domain.evento.model.ReservaPublica;
 import com.playzone.pems.domain.evento.model.enums.CanalReserva;
 import com.playzone.pems.domain.evento.model.enums.EstadoReservaPublica;
 import com.playzone.pems.domain.evento.repository.ReservaPublicaRepository;
-import com.playzone.pems.domain.finanzas.repository.AperturaCajaRepository;
+import com.playzone.pems.application.finanzas.service.EnrutadorCajaService;
+import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.domain.promocion.model.Promocion;
 import com.playzone.pems.domain.promocion.repository.PromocionRepository;
 import com.playzone.pems.domain.venta.model.Venta;
@@ -46,7 +47,8 @@ public class VentaMostradorService {
     private final VentaRepository          ventaRepository;
     private final ReservaPublicaRepository reservaRepository;
     private final VentaPagoRepository      ventaPagoRepository;
-    private final AperturaCajaRepository   aperturaCajaRepository;
+    private final SesionCajaRepository     sesionCajaRepository;
+    private final EnrutadorCajaService     enrutadorCajaService;
     private final TarifaRepository         tarifaRepository;
     private final FeriadoRepository        feriadoRepository;
     private final PromocionRepository      promocionRepository;
@@ -57,11 +59,12 @@ public class VentaMostradorService {
     @Transactional
     public VentaMostradorQuery registrar(RegistrarVentaMostradorCommand cmd) {
 
-        boolean isAdminOrSuper = authFacade.tieneRol("SUPERADMIN") || authFacade.tieneRol("ADMIN");
-        if (!isAdminOrSuper) {
-            aperturaCajaRepository.findActivaBySede(cmd.getSedeId())
-                    .orElseThrow(() -> new ValidationException(
-                            "No hay caja abierta para esta sede. Abrir caja antes de registrar ventas."));
+        UUID usuarioActual = authFacade.usuarioActualId()
+                .orElseThrow(() -> new ValidationException(
+                        "Sesion requerida para registrar venta en mostrador."));
+        if (sesionCajaRepository.findAbiertaByUsuario(usuarioActual).isEmpty()) {
+            throw new ValidationException(
+                    "No tienes una caja abierta. Abre tu caja antes de registrar ventas.");
         }
 
         java.time.ZoneId zoneId = java.time.ZoneId.of("America/Lima");
@@ -117,10 +120,6 @@ public class VentaMostradorService {
 
         BigDecimal efectivoRecibido = cmd.getEfectivoRecibido() != null ? cmd.getEfectivoRecibido() : BigDecimal.ZERO;
         BigDecimal vuelto = VentaPagoValidator.validarYCalcularVuelto(cmd.getPagos(), total, efectivoRecibido);
-
-        UUID usuarioActual = authFacade.usuarioActualId()
-                .orElseThrow(() -> new ValidationException(
-                        "Sesion requerida para registrar venta en mostrador."));
 
         Long clienteEfectivo = cmd.getClienteId() != null ? cmd.getClienteId() : ID_CLIENTE_ANONIMO;
 
@@ -205,12 +204,11 @@ public class VentaMostradorService {
             pagosGuardados.add(pago);
         }
 
-        // El movimiento de caja NO se crea aquí: los triggers de BD
-        // (trg_venta_pago_registrar_ingreso -> trg_registro_ingreso_movimiento_caja)
-        // generan el registro_ingreso y el movimiento_caja de efectivo a partir de
-        // cada venta_pago, e incrementan apertura_caja.total_ingresos. Hacerlo también
-        // aquí duplicaba el movimiento e inflaba el total de la caja. Este flujo es
-        // consistente con ReservaPublicaService / EventoPrivadoService / VentaService.
+        for (VentaPago pago : pagosGuardados) {
+            enrutadorCajaService.registrarIngresoEfectivo(
+                    usuarioActual, pago.getMedioPagoCodigo(), pago.getMonto(),
+                    "Venta mostrador #" + ventaGuardada.getId(), ventaGuardada.getId());
+        }
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 usuarioActual, AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_VENTAS,

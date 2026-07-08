@@ -4,12 +4,12 @@ import com.playzone.pems.application.auditoria.AuditoriaConstants;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.evento.dto.query.ReservaPublicaQuery;
 import com.playzone.pems.application.venta.dto.query.VentaDetalleQuery;
-import com.playzone.pems.application.venta.dto.command.ProcesarVentaCommand;
 import com.playzone.pems.application.venta.dto.command.CobrarReservaCommand;
 import com.playzone.pems.application.venta.dto.command.PagoMostradorCommand;
 import com.playzone.pems.application.venta.dto.query.VentaQuery;
 import com.playzone.pems.application.venta.port.in.ConsultarVentasUseCase;
 import com.playzone.pems.application.venta.port.in.ProcesarVentaUseCase;
+import com.playzone.pems.application.finanzas.service.EnrutadorCajaService;
 import com.playzone.pems.application.venta.port.out.EnviarDocumentosVentaPort;
 import com.playzone.pems.domain.venta.exception.VentaNotFoundException;
 import com.playzone.pems.domain.venta.model.Venta;
@@ -44,49 +44,8 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
     private final ReservaPublicaRepository reservaPublicaRepository;
     private final EnviarDocumentosVentaPort enviarDocumentosVentaPort;
     private final ConfiguracionCalendarioRepository configRepository;
+    private final EnrutadorCajaService     enrutadorCajaService;
     private final RegistrarLogUseCase      auditoria;
-
-    @Override
-    @Transactional
-    public VentaQuery ejecutar(ProcesarVentaCommand command) {
-        BigDecimal subtotal = command.getLineas().stream()
-                .map(l -> l.getPrecioUnitario().multiply(BigDecimal.valueOf(l.getCantidad())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal descuento = command.getDescuento() != null ? command.getDescuento() : BigDecimal.ZERO;
-        BigDecimal total     = subtotal.subtract(descuento);
-
-        Venta venta = Venta.builder()
-                .idSede(command.getIdSede())
-                .createdBy(command.getCreatedBy())
-                .clienteId(command.getClienteId())
-                .eventoId(command.getEventoId())
-                .tipo(command.getTipo())
-                .canalCodigo(command.getCanalCodigo())
-                .fechaVisita(command.getFechaVisita())
-                .nombreAcompanante(command.getNombreAcompanante())
-                .dniAcompanante(command.getDniAcompanante())
-                .telefonoAcompanante(command.getTelefonoAcompanante())
-                .promocionId(command.getPromocionId())
-                .efectivoRecibido(command.getEfectivoRecibido() != null ? command.getEfectivoRecibido() : BigDecimal.ZERO)
-                .vuelto(command.getVuelto() != null ? command.getVuelto() : BigDecimal.ZERO)
-                .actaFirmada(command.isActaFirmada())
-                .esAnticipada(command.isEsAnticipada())
-                .notas(command.getNotas())
-                .subtotal(subtotal)
-                .descuento(descuento)
-                .total(total)
-                .build();
-
-        Venta guardada = ventaRepository.save(venta);
-        auditoria.ejecutar(new RegistrarLogUseCase.Command(
-                command.getCreatedBy(), AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_VENTAS,
-                "Venta", guardada.getId(),
-                null, "total=" + guardada.getTotal(),
-                "Venta #" + guardada.getId() + " registrada | total=" + guardada.getTotal(),
-                null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
-        return toQuery(guardada);
-    }
 
     @Override
     @Transactional
@@ -168,6 +127,9 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
                     .validadoPor(command.getCreatedBy())
                     .validadoAt(OffsetDateTime.now())
                     .build());
+            enrutadorCajaService.registrarIngresoEfectivo(
+                    command.getCreatedBy(), pagoCmd.getMedioPago(), pagoCmd.getMonto(),
+                    "Cobro reserva venta #" + ventaGuardada.getId(), ventaGuardada.getId());
         }
 
         EstadoReservaPublica estadoInicial = EstadoReservaPublica.CONFIRMADA;

@@ -28,6 +28,7 @@ public class IngresoService implements RegistrarIngresoUseCase {
 
     private final RegistroIngresoRepository registroIngresoRepository;
     private final TipoIngresoRepository     tipoIngresoRepository;
+    private final EnrutadorCajaService      enrutadorCajaService;
     private final SupabaseAuthFacade        authFacade;
     private final RegistrarLogUseCase       auditoria;
 
@@ -49,6 +50,9 @@ public class IngresoService implements RegistrarIngresoUseCase {
                 .idUsuarioRegistra(command.getIdUsuarioRegistra())
                 .build();
         RegistroIngresoQuery resultado = toQuery(registroIngresoRepository.save(ingreso));
+        enrutadorCajaService.registrarIngresoManualEfectivo(
+                command.getIdUsuarioRegistra(), command.getMedioPago(), command.getMonto(),
+                "Ingreso manual " + tipo.getNombre() + " #" + resultado.getId(), resultado.getId());
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 command.getIdUsuarioRegistra(), AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_FINANZAS,
                 "RegistroIngreso", resultado.getId(),
