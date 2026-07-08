@@ -187,9 +187,9 @@ public class ReservaPublicaService
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(command.getIdSede()), null, null);
         if (cliente.getCorreo() != null) {
-            correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), query);
+            correoPort.enviarReservaPendiente(cliente.getCorreo(), cliente.nombreCompleto(), query);
         } else {
-            log.warn("Reserva {} sin correo de cliente {}, no se envia ticket", guardada.getId(), command.getIdCliente());
+            log.warn("Reserva {} sin correo de cliente {}, no se envia aviso de pendiente", guardada.getId(), command.getIdCliente());
         }
 
         crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
@@ -314,8 +314,12 @@ public class ReservaPublicaService
                 "Reserva #" + idReserva + " cancelada: " + motivo,
                 null, null, AuditoriaConstants.NIVEL_CRITICAL, AuditoriaConstants.RESULTADO_EXITOSO));
 
-        return toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
+        ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(guardada.getIdSede()), null, null);
+        if (cliente.getCorreo() != null) {
+            correoPort.enviarReservaCancelada(cliente.getCorreo(), cliente.nombreCompleto(), query, motivo);
+        }
+        return query;
     }
 
     @Transactional
@@ -349,6 +353,11 @@ public class ReservaPublicaService
                         "fecha", guardada.getFechaEvento().toString()))
                 .build());
 
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(guardada.getIdCliente())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente", guardada.getIdCliente()));
+        if (cliente.getCorreo() != null) {
+            correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), enriquecerQuery(guardada));
+        }
         return enriquecerQuery(guardada);
     }
 
@@ -379,6 +388,11 @@ public class ReservaPublicaService
                         "fecha", reserva.getFechaEvento().toString()))
                 .build());
 
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(reserva.getIdCliente())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente", reserva.getIdCliente()));
+        if (cliente.getCorreo() != null) {
+            correoPort.enviarReservaRechazada(cliente.getCorreo(), cliente.nombreCompleto(), enriquecerQuery(reserva), motivo);
+        }
         return enriquecerQuery(reserva);
     }
 
@@ -389,17 +403,7 @@ public class ReservaPublicaService
             byte[] bytes = archivo.getBytes();
             String key = "comprobantes/" + UUID.randomUUID() + "_" + archivo.getOriginalFilename();
             String mime = archivo.getContentType() != null ? archivo.getContentType() : "application/octet-stream";
-            try {
-                url = storagePort.upload(bucketComprobantes, key, bytes, mime);
-            } catch (Exception e) {
-                if (e.getClass().getSimpleName().equals("NoSuchBucketException") ||
-                    (e.getMessage() != null && (e.getMessage().contains("Bucket not found") || e.getMessage().contains("NoSuchBucket")))) {
-                    log.warn("Bucket '{}' no encontrado, reintentando con '{}'", bucketComprobantes, bucketPublico);
-                    url = storagePort.upload(bucketPublico, key, bytes, mime);
-                } else {
-                    throw e;
-                }
-            }
+            url = storagePort.upload(bucketComprobantes, key, bytes, mime);
         } catch (IOException e) {
             throw new RuntimeException("No se pudo leer el comprobante", e);
         }

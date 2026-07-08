@@ -13,4 +13,6 @@ public interface ConsultarReservasUseCase {
     Page<ReservaPublicaQuery> consultarPorSedeYFecha(Long idSede, LocalDate fecha, Pageable pageable);
 
     Page<ReservaPublicaQuery> consultarPorSedeYEstado(Long idSede, String estado, Pageable pageable);
+
+    ReservaPublicaQuery consultarPorId(Long idReserva);
 }

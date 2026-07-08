@@ -47,6 +47,7 @@ import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.venta.model.Venta;
 import com.playzone.pems.domain.venta.model.VentaPago;
+import com.playzone.pems.application.finanzas.service.EnrutadorCajaService;
 import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
 import com.playzone.pems.domain.venta.repository.VentaRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
@@ -101,6 +102,7 @@ public class EventoPrivadoService
     private final EventoCuotaRepository           cuotaRepository;
     private final ChecklistEventoRepository       checklistRepository;
     private final PerfilUsuarioRepository          perfilUsuarioRepository;
+    private final EnrutadorCajaService             enrutadorCajaService;
     private final RegistrarLogUseCase              auditoria;
     private final CrearNotificacionPort            crearNotificacionPort;
 
@@ -366,7 +368,12 @@ public class EventoPrivadoService
         EventoPrivado actualizado = evento.toBuilder().montoAdelanto(nuevoAdelanto).build();
         EventoPrivado guardado = eventoRepository.save(actualizado);
 
-        return toQuery(guardado, obtenerCliente(guardado.getIdCliente()), obtenerTurno(guardado.getIdTurno()), true);
+        ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
+        if (cliente.getCorreo() != null) {
+            BigDecimal saldoRestante = guardado.getPrecioContrato().subtract(guardado.getMontoAdelanto());
+            notificacionPort.notificarAbonoRecibido(cliente.getCorreo(), toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false), totalPago, saldoRestante);
+        }
+        return toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), true);
     }
 
     // ─── Registrar saldo (pago libre, sin cuotas) ─────────────────────────────
@@ -385,6 +392,9 @@ public class EventoPrivadoService
                 .validadoPor(command.getIdUsuario())
                 .validadoAt(OffsetDateTime.now())
                 .build());
+        enrutadorCajaService.registrarIngresoEfectivoAdministrativo(
+                command.getIdUsuario(), command.getMedioPago(), command.getMonto(),
+                "Saldo evento #" + evento.getId(), ventaSaldo.getId());
 
         BigDecimal nuevoAdelanto = evento.getMontoAdelanto().add(command.getMonto());
         EventoPrivado guardado = eventoRepository.save(evento.toBuilder().montoAdelanto(nuevoAdelanto).build());
@@ -399,7 +409,12 @@ public class EventoPrivadoService
                     .build());
         }
 
-        return toQuery(guardado, obtenerCliente(guardado.getIdCliente()), obtenerTurno(guardado.getIdTurno()), false);
+        ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
+        if (cliente.getCorreo() != null) {
+            BigDecimal saldoRestante = guardado.getPrecioContrato().subtract(guardado.getMontoAdelanto());
+            notificacionPort.notificarAbonoRecibido(cliente.getCorreo(), toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false), command.getMonto(), saldoRestante);
+        }
+        return toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false);
     }
 
     // ─── Completar ────────────────────────────────────────────────────────────
@@ -566,14 +581,19 @@ public class EventoPrivadoService
     }
 
     private void registrarPagos(Long ventaId, List<VentaPagoItem> pagos, UUID idUsuario) {
-        pagos.forEach(p -> ventaPagoRepository.save(VentaPago.builder()
-                .ventaId(ventaId)
-                .medioPagoCodigo(p.getMedioPagoCodigo())
-                .monto(p.getMonto())
-                .esValidado(true)
-                .validadoPor(idUsuario)
-                .validadoAt(OffsetDateTime.now())
-                .build()));
+        pagos.forEach(p -> {
+            ventaPagoRepository.save(VentaPago.builder()
+                    .ventaId(ventaId)
+                    .medioPagoCodigo(p.getMedioPagoCodigo())
+                    .monto(p.getMonto())
+                    .esValidado(true)
+                    .validadoPor(idUsuario)
+                    .validadoAt(OffsetDateTime.now())
+                    .build());
+            enrutadorCajaService.registrarIngresoEfectivoAdministrativo(
+                    idUsuario, p.getMedioPagoCodigo(), p.getMonto(),
+                    "Cobro evento venta #" + ventaId, ventaId);
+        });
     }
 
     // ─── Validaciones ─────────────────────────────────────────────────────────
