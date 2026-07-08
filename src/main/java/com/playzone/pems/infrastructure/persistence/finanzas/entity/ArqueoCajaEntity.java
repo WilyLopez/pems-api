@@ -23,8 +23,8 @@ public class ArqueoCajaEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "apertura_caja_id", nullable = false)
-    private AperturaCajaEntity aperturaCaja;
+    @JoinColumn(name = "sesion_caja_id", nullable = false)
+    private SesionCajaEntity sesionCaja;
 
     @Column(name = "saldo_esperado", nullable = false, precision = 10, scale = 2)
     private BigDecimal saldoEsperado;

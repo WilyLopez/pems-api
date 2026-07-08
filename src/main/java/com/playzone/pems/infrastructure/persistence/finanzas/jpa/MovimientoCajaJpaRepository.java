@@ -7,5 +7,7 @@ import java.util.List;
 
 public interface MovimientoCajaJpaRepository extends JpaRepository<MovimientoCajaEntity, Long> {
 
-    List<MovimientoCajaEntity> findByAperturaCaja_IdOrderByFechaCreacionAsc(Long idAperturaCaja);
+    List<MovimientoCajaEntity> findBySesionCaja_IdOrderByFechaCreacionAsc(Long idSesionCaja);
+
+    boolean existsByMovimientoAnuladoId(Long movimientoAnuladoId);
 }

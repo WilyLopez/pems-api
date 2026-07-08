@@ -1,6 +1,7 @@
 package com.playzone.pems.infrastructure.persistence.finanzas.entity;
 
 import com.playzone.pems.domain.finanzas.model.enums.CategoriaRetiro;
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
 import jakarta.persistence.*;
 import lombok.*;
@@ -25,8 +26,8 @@ public class MovimientoCajaEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "apertura_caja_id", nullable = false)
-    private AperturaCajaEntity aperturaCaja;
+    @JoinColumn(name = "sesion_caja_id", nullable = false)
+    private SesionCajaEntity sesionCaja;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo", nullable = false, length = 20)
@@ -57,6 +58,14 @@ public class MovimientoCajaEntity {
     @Column(name = "es_manual", nullable = false)
     @Builder.Default
     private boolean esManual = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "naturaleza", nullable = false, length = 20)
+    @Builder.Default
+    private NaturalezaMovimientoCaja naturaleza = NaturalezaMovimientoCaja.NORMAL;
+
+    @Column(name = "movimiento_anulado_id", updatable = false)
+    private Long movimientoAnuladoId;
 
     @Column(name = "created_by", columnDefinition = "uuid")
     private UUID createdBy;
