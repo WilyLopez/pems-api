@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Pago Rechazado - Kiki y Lala</title>
+</head>
+<body style="margin:0;padding:0;background-color:#fef2f2;font-family:Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fef2f2;padding:24px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);max-width:500px;width:100%;">
+                <tr>
+                    <td style="background:#dc2626;padding:20px;text-align:center;">
+                        <h2 style="color:#ffffff;margin:0;font-size:20px;font-weight:700;">Comprobante de Pago Rechazado</h2>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:24px;color:#334155;font-size:15px;line-height:1.5;">
+                        <p style="margin-top:0;">Hola <strong>{{nombreCliente}}</strong>,</p>
+                        <p>Te informamos que el comprobante de pago enviado para tu reserva <strong>{{numeroTicket}}</strong> ha sido rechazado por la administracion.</p>
+                        
+                        <div style="background:#fef2f2;border:1px solid #fee2e2;border-radius:8px;padding:16px;margin:20px 0;color:#991b1b;">
+                            <p style="margin:0 0 4px 0;font-weight:700;font-size:13px;">Motivo del Rechazo:</p>
+                            <p style="margin:0;font-size:14px;">{{motivo}}</p>
+                        </div>
+                        
+                        <p>Para mantener tu reserva y evitar que sea cancelada, debes ingresar a la aplicacion y subir un nuevo comprobante de pago de Yape o transferencia valido a la brevedad.</p>
+                        
+                        <div style="text-align:center;margin:24px 0;">
+                            <a href="{{urlReserva}}" style="background-color:#00AEEF;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:700;display:inline-block;box-shadow:0 2px 4px rgba(0,174,239,0.2);">Subir Nuevo Comprobante</a>
+                        </div>
+                        
+                        <p style="color:#64748b;font-size:12px;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px;text-align:center;">
+                            Kiki y Lala - Chiclayo, Peru
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
