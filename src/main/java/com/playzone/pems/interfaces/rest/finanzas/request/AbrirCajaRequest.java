@@ -1,19 +1,16 @@
 package com.playzone.pems.interfaces.rest.finanzas.request;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 @Getter
 @NoArgsConstructor
 public class AbrirCajaRequest {
 
-    @NotNull
-    private LocalDate fecha;
-
+    @PositiveOrZero
     private BigDecimal saldoInicial;
     private String     observaciones;
 }

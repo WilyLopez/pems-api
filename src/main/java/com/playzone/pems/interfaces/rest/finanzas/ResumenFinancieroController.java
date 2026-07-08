@@ -6,6 +6,7 @@ import com.playzone.pems.application.finanzas.dto.query.ResumenEventoFinancieroQ
 import com.playzone.pems.application.finanzas.dto.query.ResumenFinancieroQuery;
 import com.playzone.pems.application.finanzas.dto.query.ResumenRangoQuery;
 import com.playzone.pems.application.finanzas.port.in.ConsultarResumenFinancieroUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.interfaces.rest.finanzas.response.MetricasReservasResponse;
 import com.playzone.pems.interfaces.rest.finanzas.response.ResumenDiarioResponse;
 import com.playzone.pems.interfaces.rest.finanzas.response.ResumenEventoFinancieroResponse;
@@ -28,12 +29,14 @@ import java.util.List;
 public class ResumenFinancieroController {
 
     private final ConsultarResumenFinancieroUseCase useCase;
+    private final SedeScopeValidator                sedeScope;
 
     @GetMapping("/sedes/{idSede}/resumen-mensual")
     public ResponseEntity<ApiResponse<ResumenFinancieroResponse>> resumenMensual(
             @PathVariable Long idSede,
             @RequestParam int anio,
             @RequestParam int mes) {
+        sedeScope.validarAcceso(idSede);
         return ResponseEntity.ok(ApiResponse.ok(toResponse(useCase.resumenMensual(idSede, anio, mes))));
     }
 
@@ -48,6 +51,7 @@ public class ResumenFinancieroController {
             @PathVariable Long idSede,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        sedeScope.validarAcceso(idSede);
         List<ResumenDiarioResponse> body = useCase.resumenDiario(idSede, inicio, fin)
                 .stream().map(this::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.ok(body));
@@ -58,6 +62,7 @@ public class ResumenFinancieroController {
             @PathVariable Long idSede,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        sedeScope.validarAcceso(idSede);
         return ResponseEntity.ok(ApiResponse.ok(toResponse(useCase.resumenPorRango(idSede, inicio, fin))));
     }
 
@@ -66,6 +71,7 @@ public class ResumenFinancieroController {
             @PathVariable Long idSede,
             @RequestParam int anio,
             @RequestParam int mes) {
+        sedeScope.validarAcceso(idSede);
         return ResponseEntity.ok(ApiResponse.ok(toResponse(useCase.metricasReservas(idSede, anio, mes))));
     }
 

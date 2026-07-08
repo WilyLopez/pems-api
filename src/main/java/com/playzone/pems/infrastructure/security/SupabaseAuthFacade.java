@@ -41,4 +41,8 @@ public class SupabaseAuthFacade {
     public Optional<Long> clientePerfilId() {
         return contextoActual().map(SupabaseAuthContext::clientePerfilId);
     }
+
+    public Optional<Long> sedeId() {
+        return contextoActual().map(SupabaseAuthContext::sedeId);
+    }
 }

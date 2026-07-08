@@ -10,5 +10,6 @@ public record SupabaseAuthContext(
         List<String> roles,
         List<String> permisos,
         Long clientePerfilId,
+        Long sedeId,
         long expiresAt
 ) {}

@@ -42,6 +42,7 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
             List<String> roles,
             List<String> permisos,
             Long clientePerfilId,
+            Long sedeId,
             boolean debeCambiarPassword,
             boolean esActivo,
             boolean estaBloqueado,
@@ -144,7 +145,8 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
                 .collect(Collectors.toList());
 
         SupabaseAuthContext ctx = new SupabaseAuthContext(
-                userId, email, role, auth.roles(), auth.permisos(), auth.clientePerfilId(), expiresAt
+                userId, email, role, auth.roles(), auth.permisos(), auth.clientePerfilId(),
+                auth.sedeId(), expiresAt
         );
 
         UsernamePasswordAuthenticationToken authentication =
@@ -176,16 +178,18 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
         boolean debeCambiarPassword = false;
         boolean esActivo             = true;
         boolean estaBloqueado       = false;
+        Long    sedeId               = null;
 
         java.util.Optional<com.playzone.pems.domain.usuario.model.StaffPerfil> staff = staffPerfilRepository.buscarPorUsuarioId(userId);
         if (staff.isPresent()) {
             debeCambiarPassword = staff.get().isDebeCambiarContrasena();
             esActivo             = staff.get().isEsActivo();
-            estaBloqueado       = staff.get().getBloqueadoHasta() != null 
+            estaBloqueado       = staff.get().getBloqueadoHasta() != null
                     && staff.get().getBloqueadoHasta().isAfter(java.time.OffsetDateTime.now());
+            sedeId               = staff.get().getSedeId();
         }
 
-        CachedAuthorities fresh = new CachedAuthorities(roles, permisos, clientePerfilId,
+        CachedAuthorities fresh = new CachedAuthorities(roles, permisos, clientePerfilId, sedeId,
                 debeCambiarPassword, esActivo, estaBloqueado,
                 System.currentTimeMillis());
 

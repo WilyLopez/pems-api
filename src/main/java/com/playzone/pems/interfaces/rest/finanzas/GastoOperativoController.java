@@ -4,6 +4,7 @@ import com.playzone.pems.application.finanzas.dto.command.ActualizarGastoOperati
 import com.playzone.pems.application.finanzas.dto.command.RegistrarGastoOperativoCommand;
 import com.playzone.pems.application.finanzas.dto.query.GastoOperativoQuery;
 import com.playzone.pems.application.finanzas.port.in.GestionarGastoOperativoUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarGastoOperativoRequest;
 import com.playzone.pems.interfaces.rest.finanzas.response.GastoOperativoResponse;
@@ -26,12 +27,14 @@ public class GastoOperativoController {
 
     private final GestionarGastoOperativoUseCase useCase;
     private final SupabaseAuthFacade             supabaseAuthFacade;
+    private final SedeScopeValidator             sedeScope;
 
     @GetMapping("/sedes/{idSede}/fecha")
     @PreAuthorize("hasAuthority('egreso.ver')")
     public ResponseEntity<ApiResponse<List<GastoOperativoResponse>>> listarPorFecha(
             @PathVariable Long idSede,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        sedeScope.validarAcceso(idSede);
         List<GastoOperativoResponse> body = useCase.listarPorFecha(idSede, fecha)
                 .stream().map(this::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.ok(body));
@@ -43,6 +46,7 @@ public class GastoOperativoController {
             @PathVariable Long idSede,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        sedeScope.validarAcceso(idSede);
         List<GastoOperativoResponse> body = useCase.listarPorRango(idSede, inicio, fin)
                 .stream().map(this::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.ok(body));
@@ -53,6 +57,7 @@ public class GastoOperativoController {
     public ResponseEntity<ApiResponse<GastoOperativoResponse>> registrar(
             @PathVariable Long idSede,
             @Valid @RequestBody RegistrarGastoOperativoRequest request) {
+        sedeScope.validarAcceso(idSede);
         GastoOperativoQuery query = useCase.registrar(RegistrarGastoOperativoCommand.builder()
                 .idSede(idSede)
                 .fecha(request.getFecha())

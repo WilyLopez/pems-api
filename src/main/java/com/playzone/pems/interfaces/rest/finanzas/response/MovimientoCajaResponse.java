@@ -2,6 +2,7 @@ package com.playzone.pems.interfaces.rest.finanzas.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.playzone.pems.domain.finanzas.model.enums.CategoriaRetiro;
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,7 +15,7 @@ import java.time.OffsetDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MovimientoCajaResponse {
     private Long               id;
-    private Long               idAperturaCaja;
+    private Long               idSesionCaja;
     private TipoMovimientoCaja tipo;
     private String             concepto;
     private BigDecimal         monto;
@@ -24,5 +25,7 @@ public class MovimientoCajaResponse {
     private Long               idRegistroEgreso;
     private Long               idVenta;
     private boolean            esManual;
+    private NaturalezaMovimientoCaja naturaleza;
+    private Long               idMovimientoAnulado;
     private OffsetDateTime      fechaCreacion;
 }
