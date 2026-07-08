@@ -11,4 +11,6 @@ public interface EnviarNotificacionEventoPort {
     void notificarEventoCancelado(String destinatario, EventoPrivadoQuery evento, String motivo);
 
     void notificarAdminNuevaSolicitud(EventoPrivadoQuery evento);
+
+    void notificarAbonoRecibido(String destinatario, EventoPrivadoQuery evento, java.math.BigDecimal montoAbonado, java.math.BigDecimal saldoRestante);
 }

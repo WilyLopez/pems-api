@@ -10,9 +10,8 @@ import com.playzone.pems.domain.evento.model.enums.EstadoEventoPrivado;
 import com.playzone.pems.domain.evento.model.enums.EstadoReservaPublica;
 import com.playzone.pems.domain.evento.repository.EventoPrivadoRepository;
 import com.playzone.pems.domain.evento.repository.ReservaPublicaRepository;
-import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
-import com.playzone.pems.domain.finanzas.repository.AperturaCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.RegistroIngresoRepository;
+import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
 import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,7 @@ public class DashboardAdminService implements ConsultarDashboardAdminUseCase {
 
     private final ReservaPublicaRepository       reservaPublicaRepository;
     private final EventoPrivadoRepository        eventoPrivadoRepository;
-    private final AperturaCajaRepository         aperturaCajaRepository;
+    private final SesionCajaRepository           sesionCajaRepository;
     private final ConsultarDisponibilidadUseCase calendarioService;
     private final ClientePerfilRepository        clientePerfilRepository;
     private final RegistroIngresoRepository      registroIngresoRepository;
@@ -59,9 +58,7 @@ public class DashboardAdminService implements ConsultarDashboardAdminUseCase {
         int solicitudes    = eventoPrivadoRepository.countBySedeAndEstado(
                                  idSede, EstadoEventoPrivado.SOLICITADA);
         int saldoPendiente = eventoPrivadoRepository.countConfirmadosConSaldo(idSede);
-        boolean cajaAbierta = aperturaCajaRepository.findBySedeAndFecha(idSede, hoy)
-                .filter(c -> c.getEstado() == EstadoCaja.ABIERTA)
-                .isPresent();
+        boolean cajaAbierta = sesionCajaRepository.existsAbiertaBySede(idSede);
 
         int yapesPorValidar = (int) reservaPublicaRepository.buscarAdmin(
                 idSede,
