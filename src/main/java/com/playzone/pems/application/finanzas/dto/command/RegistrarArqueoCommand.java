@@ -9,7 +9,7 @@ import java.util.UUID;
 @Getter
 @Builder
 public class RegistrarArqueoCommand {
-    private Long       idAperturaCaja;
+    private Long       idSesionCaja;
     private BigDecimal saldoContado;
     private String     observaciones;
     private UUID       realizadoPor;

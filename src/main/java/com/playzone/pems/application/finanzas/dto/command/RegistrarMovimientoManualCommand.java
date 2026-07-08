@@ -11,7 +11,7 @@ import java.util.UUID;
 @Getter
 @Builder
 public class RegistrarMovimientoManualCommand {
-    private Long               idAperturaCaja;
+    private Long               idSesionCaja;
     private TipoMovimientoCaja tipo;
     private String             concepto;
     private BigDecimal         monto;

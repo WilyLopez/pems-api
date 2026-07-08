@@ -9,8 +9,10 @@ import java.util.UUID;
 @Getter
 @Builder
 public class CerrarCajaCommand {
-    private Long       idAperturaCaja;
+    private Long       idSesionCaja;
     private BigDecimal saldoFinal;
     private UUID       idUsuarioCierre;
+    private boolean    esAdmin;
+    private String     motivo;
     private String     observaciones;
 }
