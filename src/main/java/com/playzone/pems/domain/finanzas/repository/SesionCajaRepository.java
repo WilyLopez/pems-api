@@ -10,12 +10,13 @@ import java.util.UUID;
 
 public interface SesionCajaRepository {
     Optional<SesionCaja> findById(Long id);
+    Optional<SesionCaja> findByIdForUpdate(Long id);
     Optional<SesionCaja> findAbiertaByUsuario(UUID usuarioId);
     Optional<SesionCaja> findAbiertaByUsuarioAndSede(UUID usuarioId, Long idSede);
     Optional<SesionCaja> findByUsuarioAndSedeAndFecha(UUID usuarioId, Long idSede, LocalDate fecha);
     boolean existsAbiertaBySede(Long idSede);
     List<SesionCaja> findBySedeAndRango(Long idSede, LocalDate inicio, LocalDate fin);
     SesionCaja save(SesionCaja sesion);
-    void incrementarIngresos(Long id, BigDecimal delta);
-    void incrementarEgresos(Long id, BigDecimal delta);
+    int incrementarIngresosSiAbierta(Long id, BigDecimal delta);
+    int incrementarEgresosSiAbierta(Long id, BigDecimal delta);
 }

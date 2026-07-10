@@ -20,6 +20,8 @@ import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
 import com.playzone.pems.domain.finanzas.repository.ArqueoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.MovimientoCajaRepository;
+import com.playzone.pems.domain.configuracion.model.ConfiguracionGlobal;
+import com.playzone.pems.domain.configuracion.repository.ConfiguracionGlobalRepository;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
@@ -43,12 +45,14 @@ import java.util.UUID;
 public class SesionCajaService implements GestionarCajaUseCase {
 
     private static final ZoneId LIMA = ZoneId.of("America/Lima");
+    private static final String CLAVE_UMBRAL_DIFERENCIA = "CAJA_UMBRAL_DIFERENCIA";
 
-    private final SesionCajaRepository      sesionCajaRepository;
-    private final MovimientoCajaRepository  movimientoCajaRepository;
-    private final ArqueoCajaRepository      arqueoCajaRepository;
-    private final SupabaseAuthFacade        authFacade;
-    private final RegistrarLogUseCase       auditoria;
+    private final SesionCajaRepository           sesionCajaRepository;
+    private final MovimientoCajaRepository       movimientoCajaRepository;
+    private final ArqueoCajaRepository           arqueoCajaRepository;
+    private final ConfiguracionGlobalRepository  configuracionGlobalRepository;
+    private final SupabaseAuthFacade             authFacade;
+    private final RegistrarLogUseCase            auditoria;
 
     @Override
     public SesionCajaQuery abrir(AbrirCajaCommand command) {
@@ -88,7 +92,7 @@ public class SesionCajaService implements GestionarCajaUseCase {
 
     @Override
     public SesionCajaQuery cerrar(CerrarCajaCommand command) {
-        SesionCaja sesion = sesionCajaRepository.findById(command.getIdSesionCaja())
+        SesionCaja sesion = sesionCajaRepository.findByIdForUpdate(command.getIdSesionCaja())
                 .orElseThrow(() -> new ResourceNotFoundException("Sesion de caja no encontrada."));
         if (sesion.getEstado() == EstadoCaja.CERRADA) {
             throw new ValidationException("La caja ya está cerrada.");
@@ -106,9 +110,21 @@ public class SesionCajaService implements GestionarCajaUseCase {
             }
         }
 
-        BigDecimal saldoFinal    = command.getSaldoFinal() != null ? command.getSaldoFinal() : BigDecimal.ZERO;
+        if (command.getSaldoFinal() == null || command.getSaldoFinal().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationException(
+                    "El conteo fisico del efectivo (saldo contado) es obligatorio para cerrar la caja.");
+        }
+        BigDecimal saldoFinal    = command.getSaldoFinal();
         BigDecimal saldoEsperado = sesion.calcularSaldoEsperado();
         BigDecimal diferencia    = saldoFinal.subtract(saldoEsperado);
+
+        BigDecimal umbral = umbralDiferencia();
+        boolean sinObservaciones = command.getObservaciones() == null || command.getObservaciones().isBlank();
+        if (diferencia.abs().compareTo(umbral) > 0 && sinObservaciones) {
+            throw new ValidationException(
+                    "La diferencia de caja (S/ " + diferencia.toPlainString()
+                            + ") supera el umbral permitido. Registra una observacion que la justifique.");
+        }
 
         SesionCaja cerrada = sesion.toBuilder()
                 .estado(EstadoCaja.CERRADA)
@@ -192,10 +208,12 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .build();
         MovimientoCaja guardado = movimientoCajaRepository.save(movimiento);
 
-        if (command.getTipo() == TipoMovimientoCaja.INGRESO) {
-            sesionCajaRepository.incrementarIngresos(sesion.getId(), command.getMonto());
-        } else {
-            sesionCajaRepository.incrementarEgresos(sesion.getId(), command.getMonto());
+        int actualizados = command.getTipo() == TipoMovimientoCaja.INGRESO
+                ? sesionCajaRepository.incrementarIngresosSiAbierta(sesion.getId(), command.getMonto())
+                : sesionCajaRepository.incrementarEgresosSiAbierta(sesion.getId(), command.getMonto());
+        if (actualizados == 0) {
+            throw new ValidationException(
+                    "La caja fue cerrada mientras se registraba el movimiento. Intenta nuevamente.");
         }
 
         return toMovimientoQuery(guardado);
@@ -239,10 +257,12 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .idUsuarioRegistra(command.getIdUsuarioAnula())
                 .build());
 
-        if (original.getTipo() == TipoMovimientoCaja.INGRESO) {
-            sesionCajaRepository.incrementarIngresos(sesion.getId(), original.getMonto().negate());
-        } else {
-            sesionCajaRepository.incrementarEgresos(sesion.getId(), original.getMonto().negate());
+        int actualizados = original.getTipo() == TipoMovimientoCaja.INGRESO
+                ? sesionCajaRepository.incrementarIngresosSiAbierta(sesion.getId(), original.getMonto().negate())
+                : sesionCajaRepository.incrementarEgresosSiAbierta(sesion.getId(), original.getMonto().negate());
+        if (actualizados == 0) {
+            throw new ValidationException(
+                    "La caja fue cerrada mientras se anulaba el movimiento. Intenta nuevamente.");
         }
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
@@ -323,6 +343,19 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .movimientos(movimientos)
                 .arqueos(arqueos)
                 .build();
+    }
+
+    private BigDecimal umbralDiferencia() {
+        return configuracionGlobalRepository.findByClave(CLAVE_UMBRAL_DIFERENCIA)
+                .map(ConfiguracionGlobal::getValor)
+                .map(valor -> {
+                    try {
+                        return new BigDecimal(valor.trim());
+                    } catch (NumberFormatException e) {
+                        return BigDecimal.ZERO;
+                    }
+                })
+                .orElse(BigDecimal.ZERO);
     }
 
     private SesionCaja obtenerSesionAccesible(Long idSesionCaja) {

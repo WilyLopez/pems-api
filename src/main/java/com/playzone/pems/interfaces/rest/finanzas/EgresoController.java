@@ -1,11 +1,14 @@
 package com.playzone.pems.interfaces.rest.finanzas;
 
-import com.playzone.pems.application.finanzas.dto.command.ActualizarEgresoCommand;
+import com.playzone.pems.application.finanzas.dto.command.AnularEgresoCommand;
+import com.playzone.pems.application.finanzas.dto.command.AprobarEgresoCommand;
+import com.playzone.pems.application.finanzas.dto.command.RechazarEgresoCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarEgresoCommand;
 import com.playzone.pems.application.finanzas.dto.query.RegistroEgresoQuery;
 import com.playzone.pems.application.finanzas.port.in.RegistrarEgresoUseCase;
 import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
+import com.playzone.pems.interfaces.rest.finanzas.request.AnularRegistroRequest;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarEgresoRequest;
 import com.playzone.pems.interfaces.rest.finanzas.response.RegistroEgresoResponse;
 import com.playzone.pems.shared.response.ApiResponse;
@@ -58,6 +61,16 @@ public class EgresoController {
         return ResponseEntity.ok(ApiResponse.ok(body));
     }
 
+    @GetMapping("/sedes/{idSede}/pendientes-aprobacion")
+    @PreAuthorize("hasAuthority('egreso.ver')")
+    public ResponseEntity<ApiResponse<List<RegistroEgresoResponse>>> listarPendientesAprobacion(
+            @PathVariable Long idSede) {
+        sedeScope.validarAcceso(idSede);
+        List<RegistroEgresoResponse> body = useCase.listarPendientesAprobacion(idSede)
+                .stream().map(this::toResponse).toList();
+        return ResponseEntity.ok(ApiResponse.ok(body));
+    }
+
     @GetMapping("/sedes/{idSede}/rango")
     @PreAuthorize("hasAuthority('egreso.ver')")
     public ResponseEntity<ApiResponse<List<RegistroEgresoResponse>>> listarPorRango(
@@ -85,6 +98,7 @@ public class EgresoController {
                 .idSede(idSede)
                 .monto(request.getMonto())
                 .fecha(request.getFecha())
+                .medioPago(request.getMedioPago())
                 .periodoAnio(request.getPeriodoAnio())
                 .periodoMes(request.getPeriodoMes())
                 .descripcion(request.getDescripcion())
@@ -96,30 +110,49 @@ public class EgresoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(toResponse(query)));
     }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('egreso.editar')")
-    public ResponseEntity<ApiResponse<RegistroEgresoResponse>> actualizar(
+    @PostMapping("/{id}/anular")
+    @PreAuthorize("hasAuthority('egreso.eliminar')")
+    public ResponseEntity<ApiResponse<RegistroEgresoResponse>> anular(
             @PathVariable Long id,
-            @Valid @RequestBody RegistrarEgresoRequest request) {
-        RegistroEgresoQuery query = useCase.actualizar(ActualizarEgresoCommand.builder()
-                .id(id)
-                .tipoEgresoCodigo(request.getTipoEgresoCodigo())
-                .monto(request.getMonto())
-                .fecha(request.getFecha())
-                .periodoAnio(request.getPeriodoAnio())
-                .periodoMes(request.getPeriodoMes())
-                .descripcion(request.getDescripcion())
-                .comprobanteUrl(request.getComprobanteUrl())
-                .esRecurrente(request.isEsRecurrente())
+            @Valid @RequestBody AnularRegistroRequest request) {
+        RegistroEgresoQuery query = useCase.anular(AnularEgresoCommand.builder()
+                .idEgreso(id)
+                .motivo(request.getMotivo())
+                .idUsuarioAnula(supabaseAuthFacade.usuarioActualId()
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No autenticado")))
+                .build());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(toResponse(query)));
+    }
+
+    @PostMapping("/{id}/aprobar")
+    @PreAuthorize("hasAuthority('egreso.crear')")
+    public ResponseEntity<ApiResponse<RegistroEgresoResponse>> aprobar(@PathVariable Long id) {
+        RegistroEgresoQuery query = useCase.aprobar(AprobarEgresoCommand.builder()
+                .idEgreso(id)
+                .idUsuarioAprueba(supabaseAuthFacade.usuarioActualId()
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No autenticado")))
+                .esAdmin(esAdmin())
                 .build());
         return ResponseEntity.ok(ApiResponse.ok(toResponse(query)));
     }
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('egreso.eliminar')")
-    public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
-        useCase.eliminar(id);
-        return ResponseEntity.ok(ApiResponse.noContent());
+    @PostMapping("/{id}/rechazar")
+    @PreAuthorize("hasAuthority('egreso.crear')")
+    public ResponseEntity<ApiResponse<RegistroEgresoResponse>> rechazar(
+            @PathVariable Long id,
+            @Valid @RequestBody AnularRegistroRequest request) {
+        RegistroEgresoQuery query = useCase.rechazar(RechazarEgresoCommand.builder()
+                .idEgreso(id)
+                .motivo(request.getMotivo())
+                .idUsuarioAprueba(supabaseAuthFacade.usuarioActualId()
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No autenticado")))
+                .esAdmin(esAdmin())
+                .build());
+        return ResponseEntity.ok(ApiResponse.ok(toResponse(query)));
+    }
+
+    private boolean esAdmin() {
+        return supabaseAuthFacade.tieneRol("SUPERADMIN") || supabaseAuthFacade.tieneRol("ADMIN");
     }
 
     private RegistroEgresoResponse toResponse(RegistroEgresoQuery q) {
@@ -129,11 +162,17 @@ public class EgresoController {
                 .idSede(q.getIdSede())
                 .monto(q.getMonto())
                 .fecha(q.getFecha())
+                .medioPago(q.getMedioPago())
                 .periodoAnio(q.getPeriodoAnio())
                 .periodoMes(q.getPeriodoMes())
                 .descripcion(q.getDescripcion())
                 .comprobanteUrl(q.getComprobanteUrl())
                 .esRecurrente(q.isEsRecurrente())
+                .naturaleza(q.getNaturaleza())
+                .idRegistroAnulado(q.getIdRegistroAnulado())
+                .estadoAprobacion(q.getEstadoAprobacion())
+                .fechaAprobacion(q.getFechaAprobacion())
+                .motivoRechazo(q.getMotivoRechazo())
                 .fechaCreacion(q.getFechaCreacion())
                 .build();
     }

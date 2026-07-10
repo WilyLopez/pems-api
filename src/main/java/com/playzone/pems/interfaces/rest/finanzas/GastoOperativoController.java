@@ -1,11 +1,12 @@
 package com.playzone.pems.interfaces.rest.finanzas;
 
-import com.playzone.pems.application.finanzas.dto.command.ActualizarGastoOperativoCommand;
+import com.playzone.pems.application.finanzas.dto.command.AnularGastoOperativoCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarGastoOperativoCommand;
 import com.playzone.pems.application.finanzas.dto.query.GastoOperativoQuery;
 import com.playzone.pems.application.finanzas.port.in.GestionarGastoOperativoUseCase;
 import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
+import com.playzone.pems.interfaces.rest.finanzas.request.AnularRegistroRequest;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarGastoOperativoRequest;
 import com.playzone.pems.interfaces.rest.finanzas.response.GastoOperativoResponse;
 import com.playzone.pems.shared.response.ApiResponse;
@@ -16,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -69,26 +71,18 @@ public class GastoOperativoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(toResponse(query)));
     }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('egreso.editar')")
-    public ResponseEntity<ApiResponse<GastoOperativoResponse>> actualizar(
-            @PathVariable Long id,
-            @Valid @RequestBody RegistrarGastoOperativoRequest request) {
-        GastoOperativoQuery query = useCase.actualizar(ActualizarGastoOperativoCommand.builder()
-                .id(id)
-                .fecha(request.getFecha())
-                .descripcion(request.getDescripcion())
-                .monto(request.getMonto())
-                .comprobanteUrl(request.getComprobanteUrl())
-                .build());
-        return ResponseEntity.ok(ApiResponse.ok(toResponse(query)));
-    }
-
-    @DeleteMapping("/{id}")
+    @PostMapping("/{id}/anular")
     @PreAuthorize("hasAuthority('egreso.eliminar')")
-    public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
-        useCase.eliminar(id);
-        return ResponseEntity.ok(ApiResponse.noContent());
+    public ResponseEntity<ApiResponse<GastoOperativoResponse>> anular(
+            @PathVariable Long id,
+            @Valid @RequestBody AnularRegistroRequest request) {
+        GastoOperativoQuery query = useCase.anular(AnularGastoOperativoCommand.builder()
+                .id(id)
+                .motivo(request.getMotivo())
+                .idUsuarioAnula(supabaseAuthFacade.usuarioActualId()
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No autenticado")))
+                .build());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(toResponse(query)));
     }
 
     private GastoOperativoResponse toResponse(GastoOperativoQuery q) {
@@ -99,6 +93,8 @@ public class GastoOperativoController {
                 .descripcion(q.getDescripcion())
                 .monto(q.getMonto())
                 .comprobanteUrl(q.getComprobanteUrl())
+                .naturaleza(q.getNaturaleza())
+                .idGastoAnulado(q.getIdGastoAnulado())
                 .fechaCreacion(q.getFechaCreacion())
                 .build();
     }

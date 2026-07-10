@@ -14,6 +14,8 @@ public interface EventoPrivadoRepository {
 
     Optional<EventoPrivado> findById(Long id);
 
+    Optional<EventoPrivado> findByIdForUpdate(Long id);
+
     Page<EventoPrivado> findByCliente(Long idCliente, Pageable pageable);
 
     Page<EventoPrivado> findBySedeAndEstado(

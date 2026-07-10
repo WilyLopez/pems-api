@@ -34,6 +34,11 @@ public class SesionCajaPersistenceAdapter implements SesionCajaRepository {
     }
 
     @Override
+    public Optional<SesionCaja> findByIdForUpdate(Long id) {
+        return jpaRepository.findByIdForUpdate(id).map(this::toDomain);
+    }
+
+    @Override
     public Optional<SesionCaja> findAbiertaByUsuario(UUID usuarioId) {
         return jpaRepository.findByUsuarioIdAndEstado(usuarioId, EstadoCaja.ABIERTA).map(this::toDomain);
     }
@@ -110,14 +115,14 @@ public class SesionCajaPersistenceAdapter implements SesionCajaRepository {
 
     @Override
     @Transactional
-    public void incrementarIngresos(Long id, BigDecimal delta) {
-        jpaRepository.incrementarIngresos(id, delta);
+    public int incrementarIngresosSiAbierta(Long id, BigDecimal delta) {
+        return jpaRepository.incrementarIngresos(id, delta, EstadoCaja.ABIERTA);
     }
 
     @Override
     @Transactional
-    public void incrementarEgresos(Long id, BigDecimal delta) {
-        jpaRepository.incrementarEgresos(id, delta);
+    public int incrementarEgresosSiAbierta(Long id, BigDecimal delta) {
+        return jpaRepository.incrementarEgresos(id, delta, EstadoCaja.ABIERTA);
     }
 
     private SesionCaja toDomain(SesionCajaEntity e) {

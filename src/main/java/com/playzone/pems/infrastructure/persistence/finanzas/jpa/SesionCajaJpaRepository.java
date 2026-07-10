@@ -2,7 +2,9 @@ package com.playzone.pems.infrastructure.persistence.finanzas.jpa;
 
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
 import com.playzone.pems.infrastructure.persistence.finanzas.entity.SesionCajaEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,11 +29,19 @@ public interface SesionCajaJpaRepository extends JpaRepository<SesionCajaEntity,
     List<SesionCajaEntity> findBySede_IdAndFechaAperturaBetweenOrderByFechaAperturaDesc(
             Long idSede, OffsetDateTime desde, OffsetDateTime hasta);
 
-    @Modifying
-    @Query("UPDATE SesionCajaEntity s SET s.totalIngresos = s.totalIngresos + :delta WHERE s.id = :id")
-    int incrementarIngresos(@Param("id") Long id, @Param("delta") BigDecimal delta);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM SesionCajaEntity s WHERE s.id = :id")
+    Optional<SesionCajaEntity> findByIdForUpdate(@Param("id") Long id);
 
     @Modifying
-    @Query("UPDATE SesionCajaEntity s SET s.totalEgresos = s.totalEgresos + :delta WHERE s.id = :id")
-    int incrementarEgresos(@Param("id") Long id, @Param("delta") BigDecimal delta);
+    @Query("UPDATE SesionCajaEntity s SET s.totalIngresos = s.totalIngresos + :delta " +
+           "WHERE s.id = :id AND s.estado = :estado")
+    int incrementarIngresos(@Param("id") Long id, @Param("delta") BigDecimal delta,
+                            @Param("estado") EstadoCaja estado);
+
+    @Modifying
+    @Query("UPDATE SesionCajaEntity s SET s.totalEgresos = s.totalEgresos + :delta " +
+           "WHERE s.id = :id AND s.estado = :estado")
+    int incrementarEgresos(@Param("id") Long id, @Param("delta") BigDecimal delta,
+                           @Param("estado") EstadoCaja estado);
 }

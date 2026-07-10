@@ -31,6 +31,11 @@ public class GastoOperativoDiarioPersistenceAdapter implements GastoOperativoDia
     }
 
     @Override
+    public boolean existsAnuladoPara(Long idGastoOriginal) {
+        return jpaRepository.existsByGastoAnuladoId(idGastoOriginal);
+    }
+
+    @Override
     public List<GastoOperativoDiario> findBySedeAndFecha(Long idSede, LocalDate fecha) {
         return jpaRepository.findBySede_IdAndFecha(idSede, fecha).stream()
                 .map(mapper::toDomain).toList();
@@ -73,14 +78,10 @@ public class GastoOperativoDiarioPersistenceAdapter implements GastoOperativoDia
                 .descripcion(gasto.getDescripcion())
                 .monto(gasto.getMonto())
                 .comprobantePath(gasto.getComprobanteUrl())
+                .naturaleza(gasto.getNaturaleza())
+                .gastoAnuladoId(gasto.getIdGastoAnulado())
                 .createdBy(gasto.getIdUsuarioRegistra())
                 .build();
         return mapper.toDomain(jpaRepository.save(entity));
-    }
-
-    @Override
-    @Transactional
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
     }
 }

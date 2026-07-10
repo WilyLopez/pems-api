@@ -14,6 +14,9 @@ import java.util.Optional;
 
 public interface RegistroEgresoRepository {
     Optional<RegistroEgreso> findById(Long id);
+    Optional<RegistroEgreso> findByIdForUpdate(Long id);
+    boolean existsAnuladoPara(Long idRegistroOriginal);
+    List<RegistroEgreso> findPendientesAprobacion(Long idSede);
     Page<RegistroEgreso> findBySede(Long idSede, Pageable pageable);
     List<RegistroEgreso> findBySedeAndPeriodo(Long idSede, int anio, int mes);
     List<RegistroEgreso> findBySedeAndRangoFecha(Long idSede, LocalDate inicio, LocalDate fin);

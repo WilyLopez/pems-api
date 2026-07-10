@@ -3,7 +3,7 @@ package com.playzone.pems.infrastructure.persistence.finanzas.adapter;
 import com.playzone.pems.domain.finanzas.model.ArqueoCaja;
 import com.playzone.pems.domain.finanzas.repository.ArqueoCajaRepository;
 import com.playzone.pems.infrastructure.persistence.finanzas.entity.ArqueoCajaEntity;
-import com.playzone.pems.infrastructure.persistence.finanzas.jpa.AperturaCajaJpaRepository;
+import com.playzone.pems.infrastructure.persistence.finanzas.jpa.SesionCajaJpaRepository;
 import com.playzone.pems.infrastructure.persistence.finanzas.jpa.ArqueoCajaJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,14 +16,14 @@ import java.util.List;
 public class ArqueoCajaPersistenceAdapter implements ArqueoCajaRepository {
 
     private final ArqueoCajaJpaRepository  jpaRepository;
-    private final AperturaCajaJpaRepository aperturaCajaJpaRepository;
+    private final SesionCajaJpaRepository sesionCajaJpaRepository;
 
     @Override
     @Transactional
     public ArqueoCaja save(ArqueoCaja arqueo) {
         ArqueoCajaEntity entity = ArqueoCajaEntity.builder()
                 .id(arqueo.getId())
-                .aperturaCaja(aperturaCajaJpaRepository.getReferenceById(arqueo.getIdAperturaCaja()))
+                .sesionCaja(sesionCajaJpaRepository.getReferenceById(arqueo.getIdSesionCaja()))
                 .saldoEsperado(arqueo.getSaldoEsperado())
                 .saldoContado(arqueo.getSaldoContado())
                 .diferencia(arqueo.getDiferencia())
@@ -34,15 +34,15 @@ public class ArqueoCajaPersistenceAdapter implements ArqueoCajaRepository {
     }
 
     @Override
-    public List<ArqueoCaja> findByApertura(Long idAperturaCaja) {
-        return jpaRepository.findByAperturaCaja_IdOrderByFechaCreacionAsc(idAperturaCaja)
+    public List<ArqueoCaja> findBySesion(Long idSesionCaja) {
+        return jpaRepository.findBySesionCaja_IdOrderByFechaCreacionAsc(idSesionCaja)
                 .stream().map(this::toDomain).toList();
     }
 
     private ArqueoCaja toDomain(ArqueoCajaEntity e) {
         return ArqueoCaja.builder()
                 .id(e.getId())
-                .idAperturaCaja(e.getAperturaCaja().getId())
+                .idSesionCaja(e.getSesionCaja().getId())
                 .saldoEsperado(e.getSaldoEsperado())
                 .saldoContado(e.getSaldoContado())
                 .diferencia(e.getDiferencia())

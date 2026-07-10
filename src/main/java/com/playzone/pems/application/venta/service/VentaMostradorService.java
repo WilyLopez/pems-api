@@ -62,9 +62,9 @@ public class VentaMostradorService {
         UUID usuarioActual = authFacade.usuarioActualId()
                 .orElseThrow(() -> new ValidationException(
                         "Sesion requerida para registrar venta en mostrador."));
-        if (sesionCajaRepository.findAbiertaByUsuario(usuarioActual).isEmpty()) {
+        if (sesionCajaRepository.findAbiertaByUsuarioAndSede(usuarioActual, cmd.getSedeId()).isEmpty()) {
             throw new ValidationException(
-                    "No tienes una caja abierta. Abre tu caja antes de registrar ventas.");
+                    "No tienes una caja abierta en la sede indicada. Abre tu caja antes de registrar ventas.");
         }
 
         java.time.ZoneId zoneId = java.time.ZoneId.of("America/Lima");

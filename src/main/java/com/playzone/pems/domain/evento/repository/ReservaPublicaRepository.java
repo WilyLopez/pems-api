@@ -17,6 +17,8 @@ public interface ReservaPublicaRepository {
 
     Optional<ReservaPublica> findById(Long id);
 
+    Optional<ReservaPublica> findByIdForUpdate(Long id);
+
     Optional<ReservaPublica> findByNumeroTicket(String numeroTicket);
 
     Page<ReservaPublica> findByCliente(Long idCliente, Pageable pageable);

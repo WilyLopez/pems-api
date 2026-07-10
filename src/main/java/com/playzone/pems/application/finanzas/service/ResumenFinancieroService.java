@@ -15,6 +15,7 @@ import com.playzone.pems.domain.finanzas.repository.GastoOperativoDiarioReposito
 import com.playzone.pems.domain.finanzas.repository.RegistroEgresoRepository;
 import com.playzone.pems.domain.finanzas.repository.TipoEgresoRepository;
 import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ public class ResumenFinancieroService implements ConsultarResumenFinancieroUseCa
     private final GastoOperativoDiarioRepository gastoOperativoRepository;
     private final TipoEgresoRepository           tipoEgresoRepository;
     private final VentaPagoRepository            ventaPagoRepository;
+    private final SedeScopeValidator             sedeScope;
 
     @Override
     public ResumenFinancieroQuery resumenMensual(Long idSede, int anio, int mes) {
@@ -95,6 +97,7 @@ public class ResumenFinancieroService implements ConsultarResumenFinancieroUseCa
     public ResumenEventoFinancieroQuery resumenEvento(Long idEvento) {
         EventoPrivado evento = eventoPrivadoRepository.findById(idEvento)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento privado no encontrado."));
+        sedeScope.validarAcceso(evento.getIdSede());
 
         BigDecimal ingresoContrato = evento.getPrecioContrato() != null
                 ? evento.getPrecioContrato() : BigDecimal.ZERO;

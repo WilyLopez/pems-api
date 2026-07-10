@@ -4,9 +4,11 @@ import com.playzone.pems.domain.evento.model.enums.EstadoReservaPublica;
 import com.playzone.pems.domain.evento.query.IngresosPorDia;
 import com.playzone.pems.domain.evento.query.ReservasPorDia;
 import com.playzone.pems.infrastructure.persistence.evento.entity.ReservaPublicaEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,6 +20,10 @@ import java.util.Optional;
 public interface ReservaPublicaJpaRepository extends JpaRepository<ReservaPublicaEntity, Long> {
 
     Optional<ReservaPublicaEntity> findByNumeroTicket(String numeroTicket);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ReservaPublicaEntity r WHERE r.id = :id")
+    Optional<ReservaPublicaEntity> findByIdForUpdate(@Param("id") Long id);
 
     Page<ReservaPublicaEntity> findByClienteId(Long clienteId, Pageable pageable);
 

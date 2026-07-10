@@ -13,11 +13,14 @@ import java.util.Optional;
 
 public interface RegistroIngresoRepository {
     Optional<RegistroIngreso> findById(Long id);
+    boolean existsAnuladoPara(Long idRegistroOriginal);
+    List<RegistroIngreso> findTesoreriaWeb(Long idSede, LocalDate inicio, LocalDate fin);
     Page<RegistroIngreso> findBySede(Long idSede, Pageable pageable);
     List<RegistroIngreso> findBySedeAndRangoFecha(Long idSede, LocalDate inicio, LocalDate fin);
     List<RegistroIngreso> findBySedeAndPeriodo(Long idSede, int anio, int mes);
     BigDecimal sumMontoBySedeAndPeriodo(Long idSede, int anio, int mes);
     BigDecimal sumMontoBySedeAndRango(Long idSede, LocalDate inicio, LocalDate fin);
+    BigDecimal sumMontoBySedeAndRangoCobro(Long idSede, LocalDate inicio, LocalDate fin);
     Map<String, BigDecimal> sumMontoAgrupadoPorTipo(Long idSede, int anio, int mes);
     List<MontoPorDia> sumMontoAgrupadoPorDia(Long idSede, LocalDate inicio, LocalDate fin);
     RegistroIngreso save(RegistroIngreso registro);

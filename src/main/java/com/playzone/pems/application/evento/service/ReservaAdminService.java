@@ -19,8 +19,8 @@ import com.playzone.pems.domain.evento.repository.EventoPrivadoRepository;
 import com.playzone.pems.domain.evento.repository.ReservaPublicaRepository;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
 import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
-import com.playzone.pems.domain.venta.repository.VentaRepository;
 import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.util.FechaUtil;
@@ -33,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -49,16 +48,17 @@ public class ReservaAdminService
     private final ConfiguracionCalendarioRepository configRepository;
     private final EventoPrivadoRepository           eventoRepository;
     private final RegistrarVisitaUseCase            registrarVisitaUseCase;
-    private final VentaRepository                   ventaRepository;
     private final VentaPagoRepository               ventaPagoRepository;
     private final SupabaseAuthFacade                authFacade;
     private final RegistrarLogUseCase               auditoria;
+    private final SedeScopeValidator                sedeScope;
 
     @Override
     @Transactional
     public ReservaPublicaQuery ejecutar(Long idReserva, UUID idUsuarioAdmin) {
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(reserva.getIdSede());
 
         if (reserva.getFechaEvento().isBefore(LocalDate.now(ZoneId.of("America/Lima")))) {
             throw new ValidationException(
@@ -105,6 +105,8 @@ public class ReservaAdminService
             Boolean ingresado, Boolean esReprogramacion,
             String medioPago, String search, Pageable pageable) {
 
+        sedeScope.validarAccesoFiltro(idSede);
+
         EstadoReservaPublica estadoEnum = null;
         if (estado != null && !estado.isBlank()) {
             try { estadoEnum = EstadoReservaPublica.valueOf(estado); }
@@ -131,6 +133,7 @@ public class ReservaAdminService
     @Override
     @Transactional(readOnly = true)
     public MetricasReservaQuery metricas(Long idSede, LocalDate fecha) {
+        sedeScope.validarAccesoFiltro(idSede);
         LocalDate dia = fecha != null ? fecha : LocalDate.now(ZoneId.of("America/Lima"));
         return reservaRepository.calcularMetricas(idSede, dia);
     }
@@ -139,6 +142,7 @@ public class ReservaAdminService
     public TicketDetalleQuery buscarTicketDetalle(String numeroTicket) {
         ReservaPublica r = reservaRepository.findByNumeroTicket(numeroTicket)
                 .orElseThrow(() -> new ReservaNotFoundException(0L));
+        sedeScope.validarAcceso(r.getIdSede());
         return toDetalle(r);
     }
 
@@ -146,6 +150,7 @@ public class ReservaAdminService
     public TicketDetalleQuery marcarEntrada(Long idReserva) {
         ReservaPublica r = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(r.getIdSede());
 
         if (r.getFechaEvento().isBefore(LocalDate.now(ZoneId.of("America/Lima")))) {
             throw new ValidationException(
@@ -177,6 +182,7 @@ public class ReservaAdminService
     public TicketDetalleQuery editarFecha(Long idReserva, LocalDate nuevaFecha) {
         ReservaPublica r = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(r.getIdSede());
 
         if (r.isIngresado()) {
             throw new ValidationException("No se puede cambiar la fecha de un ticket ya ingresado.");
@@ -300,18 +306,14 @@ public class ReservaAdminService
     public void eliminar(Long idReserva) {
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(reserva.getIdSede());
 
-        Long ventaId = reserva.getVentaId();
+        if (reserva.getVentaId() != null) {
+            throw new ValidationException(
+                    "No se puede eliminar una reserva con una venta asociada. Usa la cancelacion de reserva.");
+        }
 
         reservaRepository.deleteById(idReserva);
-
-        if (ventaId != null) {
-            List<ReservaPublica> otras = reservaRepository.findByVentaId(ventaId);
-            if (otras.isEmpty()) {
-                ventaPagoRepository.deleteByVentaId(ventaId);
-                ventaRepository.deleteById(ventaId);
-            }
-        }
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 authFacade.usuarioActualId().orElse(null),

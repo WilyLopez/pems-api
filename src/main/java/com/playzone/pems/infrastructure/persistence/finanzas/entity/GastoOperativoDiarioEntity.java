@@ -1,5 +1,6 @@
 package com.playzone.pems.infrastructure.persistence.finanzas.entity;
 
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.infrastructure.persistence.usuario.entity.SedeEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -39,6 +40,14 @@ public class GastoOperativoDiarioEntity {
 
     @Column(name = "comprobante_path", length = 500)
     private String comprobantePath;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "naturaleza", nullable = false, length = 20)
+    @Builder.Default
+    private NaturalezaMovimientoCaja naturaleza = NaturalezaMovimientoCaja.NORMAL;
+
+    @Column(name = "gasto_anulado_id", updatable = false)
+    private Long gastoAnuladoId;
 
     @Column(name = "created_by", columnDefinition = "uuid")
     private UUID createdBy;

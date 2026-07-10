@@ -33,6 +33,17 @@ public class RegistroIngresoPersistenceAdapter implements RegistroIngresoReposit
     }
 
     @Override
+    public boolean existsAnuladoPara(Long idRegistroOriginal) {
+        return jpaRepository.existsByRegistroAnuladoId(idRegistroOriginal);
+    }
+
+    @Override
+    public List<RegistroIngreso> findTesoreriaWeb(Long idSede, LocalDate inicio, LocalDate fin) {
+        return jpaRepository.findTesoreriaWeb(idSede, inicio, fin)
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public Page<RegistroIngreso> findBySede(Long idSede, Pageable pageable) {
         return jpaRepository.findBySede_IdWithTipo(idSede, pageable).map(this::toDomain);
     }
@@ -57,6 +68,11 @@ public class RegistroIngresoPersistenceAdapter implements RegistroIngresoReposit
     @Override
     public BigDecimal sumMontoBySedeAndRango(Long idSede, LocalDate inicio, LocalDate fin) {
         return jpaRepository.sumMontoBySedeAndRango(idSede, inicio, fin);
+    }
+
+    @Override
+    public BigDecimal sumMontoBySedeAndRangoCobro(Long idSede, LocalDate inicio, LocalDate fin) {
+        return jpaRepository.sumMontoBySedeAndRangoCobro(idSede, inicio, fin);
     }
 
     @Override
@@ -87,9 +103,12 @@ public class RegistroIngresoPersistenceAdapter implements RegistroIngresoReposit
                 .eventoId(ingreso.getIdEventoPrivado())
                 .monto(ingreso.getMonto())
                 .fecha(ingreso.getFecha())
+                .fechaCobro(ingreso.getFechaCobro())
                 .medioPagoCodigo(ingreso.getMedioPago())
                 .descripcion(ingreso.getDescripcion())
                 .esAutomatico(ingreso.isEsAutomatico())
+                .naturaleza(ingreso.getNaturaleza())
+                .registroAnuladoId(ingreso.getIdRegistroAnulado())
                 .createdBy(ingreso.getIdUsuarioRegistra())
                 .build();
         return toDomain(jpaRepository.save(entity));
@@ -110,9 +129,12 @@ public class RegistroIngresoPersistenceAdapter implements RegistroIngresoReposit
                 .idEventoPrivado(e.getEventoId())
                 .monto(e.getMonto())
                 .fecha(e.getFecha())
+                .fechaCobro(e.getFechaCobro())
                 .medioPago(e.getMedioPagoCodigo())
                 .descripcion(e.getDescripcion())
                 .esAutomatico(e.isEsAutomatico())
+                .naturaleza(e.getNaturaleza())
+                .idRegistroAnulado(e.getRegistroAnuladoId())
                 .idUsuarioRegistra(e.getCreatedBy())
                 .fechaCreacion(e.getCreatedAt() != null ? e.getCreatedAt() : null)
                 .build();

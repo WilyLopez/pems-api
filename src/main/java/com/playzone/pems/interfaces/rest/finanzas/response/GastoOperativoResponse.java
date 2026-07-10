@@ -1,5 +1,6 @@
 package com.playzone.pems.interfaces.rest.finanzas.response;
 
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -16,5 +17,7 @@ public class GastoOperativoResponse {
     private String        descripcion;
     private BigDecimal    monto;
     private String        comprobanteUrl;
+    private NaturalezaMovimientoCaja naturaleza;
+    private Long          idGastoAnulado;
     private OffsetDateTime fechaCreacion;
 }

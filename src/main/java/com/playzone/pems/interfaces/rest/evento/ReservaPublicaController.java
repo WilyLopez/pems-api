@@ -14,6 +14,7 @@ import com.playzone.pems.interfaces.rest.evento.request.ReprogramarReservaReques
 import com.playzone.pems.interfaces.rest.evento.response.MetricasReservaResponse;
 import com.playzone.pems.interfaces.rest.evento.response.ReservaPublicaResponse;
 import com.playzone.pems.interfaces.rest.evento.response.TicketDetalleResponse;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.response.ApiResponse;
@@ -61,6 +62,7 @@ public class ReservaPublicaController {
     private final SupabaseAuthFacade          supabaseAuthFacade;
     private final TicketIngresoPdfService     ticketIngresoPdfService;
     private final SedeRepository              sedeRepository;
+    private final SedeScopeValidator          sedeScope;
 
     @GetMapping("/catalogos/estados")
     @PreAuthorize("hasAuthority('reserva.ver')")
@@ -88,8 +90,10 @@ public class ReservaPublicaController {
         if (idClienteEfectivo != null) {
             result = consultarUseCase.consultarPorCliente(idClienteEfectivo, pageable);
         } else if (idSede != null && fecha != null) {
+            sedeScope.validarAcceso(idSede);
             result = consultarUseCase.consultarPorSedeYFecha(idSede, fecha, pageable);
         } else if (idSede != null && estado != null) {
+            sedeScope.validarAcceso(idSede);
             result = consultarUseCase.consultarPorSedeYEstado(idSede, estado, pageable);
         } else {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -149,14 +153,18 @@ public class ReservaPublicaController {
     @PreAuthorize("hasAuthority('reserva.ver')")
     public ResponseEntity<ApiResponse<ReservaPublicaResponse>> obtenerPorTicket(
             @PathVariable String numeroTicket) {
-        return ResponseEntity.ok(ApiResponse.ok(toResponse(reservaService.consultarPorNumeroTicket(numeroTicket))));
+        ReservaPublicaQuery query = reservaService.consultarPorNumeroTicket(numeroTicket);
+        sedeScope.validarAcceso(query.getIdSede());
+        return ResponseEntity.ok(ApiResponse.ok(toResponse(query)));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('reserva.ver')")
     public ResponseEntity<ApiResponse<ReservaPublicaResponse>> obtenerPorId(
             @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(toResponse(reservaService.consultarPorId(id))));
+        ReservaPublicaQuery query = reservaService.consultarPorId(id);
+        sedeScope.validarAcceso(query.getIdSede());
+        return ResponseEntity.ok(ApiResponse.ok(toResponse(query)));
     }
 
     @PostMapping("/clientes/{idCliente}/sedes/{idSede}")
@@ -165,6 +173,8 @@ public class ReservaPublicaController {
             @PathVariable Long idCliente,
             @PathVariable Long idSede,
             @Valid @RequestBody CrearReservaRequest request) {
+
+        sedeScope.validarAcceso(idSede);
 
         ReservaPublicaQuery query = crearUseCase.ejecutar(
                 CrearReservaPublicaCommand.builder()
@@ -255,7 +265,8 @@ public class ReservaPublicaController {
     @PreAuthorize("hasAuthority('reserva.ver')")
     public ResponseEntity<byte[]> descargarTicket(@PathVariable Long idReserva) {
         ReservaPublicaQuery reserva = reservaService.consultarPorId(idReserva);
-        
+        sedeScope.validarAcceso(reserva.getIdSede());
+
         String nombreSede = sedeRepository.findById(reserva.getIdSede())
                 .map(s -> s.getNombre())
                 .orElse("Sede Principal");

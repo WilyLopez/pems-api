@@ -26,20 +26,12 @@ public class PreferenciaUsuarioPersistenceAdapter implements PreferenciaUsuarioR
     @Override
     public PreferenciaUsuario guardar(PreferenciaUsuario preferencia) {
         PreferenciaUsuarioEntity entity = jpaRepository.findById(preferencia.getUsuarioId())
-                .orElseGet(() -> {
-                    PreferenciaUsuarioEntity e = new PreferenciaUsuarioEntity();
-                    e.setUsuarioId(preferencia.getUsuarioId());
-                    return e;
-                });
+                .orElseGet(() -> PreferenciaUsuarioEntity.builder()
+                        .usuarioId(preferencia.getUsuarioId())
+                        .build());
 
         PreferenciaUsuarioEntity updated = mapper.toEntity(preferencia);
         entity.setTema(updated.getTema());
-        entity.setIdioma(updated.getIdioma());
-        entity.setZonaHoraria(updated.getZonaHoraria());
-        entity.setFormatoFecha(updated.getFormatoFecha());
-        entity.setFormatoHora(updated.getFormatoHora());
-        entity.setSidebarColapsado(updated.isSidebarColapsado());
-        entity.setAutorefreshDashboard(updated.isAutorefreshDashboard());
         entity.setPreferenciasExtras(updated.getPreferenciasExtras());
 
         return mapper.toDomain(jpaRepository.save(entity));

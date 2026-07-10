@@ -46,7 +46,7 @@ public class DashboardAdminService implements ConsultarDashboardAdminUseCase {
         int pendientesPago = reservaPublicaRepository.countBySedeAndFechaAndEstado(
                                  idSede, hoy, EstadoReservaPublica.PENDIENTE);
 
-        BigDecimal ingresosHoy = registroIngresoRepository.sumMontoBySedeAndRango(idSede, hoy, hoy);
+        BigDecimal ingresosHoy = registroIngresoRepository.sumMontoBySedeAndRangoCobro(idSede, hoy, hoy);
         if (ingresosHoy == null) ingresosHoy = BigDecimal.ZERO;
 
         DisponibilidadQuery hoyDisp = calendarioService.consultarPorFecha(idSede, hoy);

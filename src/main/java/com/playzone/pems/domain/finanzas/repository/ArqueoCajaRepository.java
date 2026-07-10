@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface ArqueoCajaRepository {
     ArqueoCaja save(ArqueoCaja arqueo);
-    List<ArqueoCaja> findByApertura(Long idAperturaCaja);
+    List<ArqueoCaja> findBySesion(Long idSesionCaja);
 }

@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public interface GastoOperativoDiarioRepository {
     Optional<GastoOperativoDiario> findById(Long id);
+    boolean existsAnuladoPara(Long idGastoOriginal);
     List<GastoOperativoDiario> findBySedeAndFecha(Long idSede, LocalDate fecha);
     List<GastoOperativoDiario> findBySedeAndRangoFecha(Long idSede, LocalDate inicio, LocalDate fin);
     BigDecimal sumMontoBySedeAndFecha(Long idSede, LocalDate fecha);
@@ -17,5 +18,4 @@ public interface GastoOperativoDiarioRepository {
     BigDecimal sumMontoBySedeAndRango(Long idSede, LocalDate inicio, LocalDate fin);
     List<GastosPorDia> sumMontoAgrupadoPorDia(Long idSede, LocalDate inicio, LocalDate fin);
     GastoOperativoDiario save(GastoOperativoDiario gasto);
-    void deleteById(Long id);
 }

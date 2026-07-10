@@ -32,6 +32,10 @@ public class EventoPrivadoPersistenceAdapter implements EventoPrivadoRepository 
         return eventoJpa.findById(id).map(mapper::toDomain);
     }
 
+    @Override public Optional<EventoPrivado> findByIdForUpdate(Long id) {
+        return eventoJpa.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
     @Override public Page<EventoPrivado> findByCliente(Long idCliente, Pageable pageable) {
         return eventoJpa.findByClienteId(idCliente, pageable).map(mapper::toDomain);
     }

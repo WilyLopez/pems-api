@@ -163,6 +163,22 @@ public class CorreoAdapter
 
     @Async("asyncExecutor")
     @Override
+    public void notificarAbonoRecibido(String destinatario, EventoPrivadoQuery evento,
+                                       java.math.BigDecimal montoAbonado, java.math.BigDecimal saldoRestante) {
+        String asunto = "Abono recibido — Kiki y Lala";
+        String cuerpo = htmlBase(
+            "Abono recibido",
+            "<p>Hola <b>" + evento.getNombreCliente() + "</b>,</p>"
+            + "<p>Hemos registrado tu abono para el evento del <b>" + evento.getFechaEvento() + "</b>.</p>"
+            + filaFinanciera("Monto abonado", "S/ " + montoAbonado)
+            + filaFinanciera("Saldo pendiente", "S/ " + saldoRestante)
+            + "<p style='color:#64748b;font-size:13px;margin-top:16px;'>Gracias por tu pago.</p>"
+        );
+        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
+    }
+
+    @Async("asyncExecutor")
+    @Override
     public void notificarAdminNuevaSolicitud(EventoPrivadoQuery evento) {
         String correoAdmin = adminEmailOverride;
         if (correoAdmin == null || correoAdmin.isBlank()) {
@@ -183,6 +199,47 @@ public class CorreoAdapter
             + "<p style='margin-top:16px;'><a href='#' style='background:#00AEEF;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;'>Ver en el panel</a></p>"
         );
         correoClient.enviar(correoAdmin, asunto, cuerpo);
+    }
+
+    @Async("asyncExecutor")
+    @Override
+    public void enviarReservaPendiente(String destinatario, String nombreCliente, ReservaPublicaQuery reserva) {
+        String asunto = "Reserva pendiente de confirmacion — Kiki y Lala";
+        String cuerpo = htmlBase(
+            "Reserva pendiente",
+            "<p>Hola <b>" + nombreCliente + "</b>,</p>"
+            + "<p>Tu reserva <b>#" + reserva.getNumeroTicket() + "</b> para el dia <b>" + reserva.getFechaEvento() + "</b> ha sido recibida y esta pendiente de confirmacion.</p>"
+            + "<p style='color:#64748b;font-size:13px;'>Nuestro equipo revisara tu solicitud y te notificaremos a la brevedad.</p>"
+        );
+        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
+    }
+
+    @Async("asyncExecutor")
+    @Override
+    public void enviarReservaRechazada(String destinatario, String nombreCliente, ReservaPublicaQuery reserva, String motivo) {
+        String asunto = "Reserva rechazada — Kiki y Lala";
+        String cuerpo = htmlBase(
+            "Reserva rechazada",
+            "<p>Hola <b>" + nombreCliente + "</b>,</p>"
+            + "<p>Tu reserva para el dia <b>" + reserva.getFechaEvento() + "</b> no pudo ser aprobada.</p>"
+            + (motivo != null ? "<p><b>Motivo:</b> " + motivo + "</p>" : "")
+            + "<p style='color:#64748b;font-size:13px;'>Si tienes dudas, contactanos por WhatsApp o correo.</p>"
+        );
+        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
+    }
+
+    @Async("asyncExecutor")
+    @Override
+    public void enviarReservaCancelada(String destinatario, String nombreCliente, ReservaPublicaQuery reserva, String motivo) {
+        String asunto = "Reserva cancelada — Kiki y Lala";
+        String cuerpo = htmlBase(
+            "Reserva cancelada",
+            "<p>Hola <b>" + nombreCliente + "</b>,</p>"
+            + "<p>Tu reserva <b>#" + reserva.getNumeroTicket() + "</b> para el dia <b>" + reserva.getFechaEvento() + "</b> ha sido cancelada.</p>"
+            + (motivo != null ? "<p><b>Motivo:</b> " + motivo + "</p>" : "")
+            + "<p style='color:#64748b;font-size:13px;'>Si deseas reagendar, escribenos por WhatsApp.</p>"
+        );
+        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
     }
 
     private String htmlBase(String titulo, String contenido) {
