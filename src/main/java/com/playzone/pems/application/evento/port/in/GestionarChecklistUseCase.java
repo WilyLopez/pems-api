@@ -13,11 +13,11 @@ public interface GestionarChecklistUseCase {
         return listar(idEvento);
     }
 
-    ChecklistEventoQuery completar(Long idChecklist, UUID idUsuarioAdmin);
+    ChecklistEventoQuery completar(Long idEvento, Long idChecklist, UUID idUsuarioAdmin);
 
-    ChecklistEventoQuery descompletar(Long idChecklist);
+    ChecklistEventoQuery descompletar(Long idEvento, Long idChecklist);
 
     ChecklistEventoQuery agregarTarea(Long idEvento, String tarea);
 
-    void eliminarTarea(Long idChecklist);
+    void eliminarTarea(Long idEvento, Long idChecklist);
 }

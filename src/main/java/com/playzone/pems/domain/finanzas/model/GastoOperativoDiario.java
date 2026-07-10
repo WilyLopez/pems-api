@@ -1,5 +1,6 @@
 package com.playzone.pems.domain.finanzas.model;
 
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -19,5 +20,12 @@ public class GastoOperativoDiario {
     private BigDecimal    monto;
     private String        comprobanteUrl;
     private UUID          idUsuarioRegistra;
+    @Builder.Default
+    private NaturalezaMovimientoCaja naturaleza = NaturalezaMovimientoCaja.NORMAL;
+    private Long          idGastoAnulado;
     private OffsetDateTime fechaCreacion;
+
+    public boolean esContraasiento() {
+        return naturaleza == NaturalezaMovimientoCaja.CONTRAASIENTO;
+    }
 }

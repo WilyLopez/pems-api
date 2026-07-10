@@ -12,7 +12,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ArqueoCaja {
     private Long           id;
-    private Long           idAperturaCaja;
+    private Long           idSesionCaja;
     private BigDecimal     saldoEsperado;
     private BigDecimal     saldoContado;
     private BigDecimal     diferencia;

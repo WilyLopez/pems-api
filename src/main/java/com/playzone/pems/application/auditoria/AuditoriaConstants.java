@@ -38,6 +38,8 @@ public final class AuditoriaConstants {
     public static final String ACCION_ARQUEO        = "ARQUEO";
     public static final String ACCION_EMITIR        = "EMITIR";
     public static final String ACCION_ANULAR        = "ANULAR";
+    public static final String ACCION_APROBAR       = "APROBAR";
+    public static final String ACCION_RECHAZAR      = "RECHAZAR";
     public static final String ACCION_ACTIVAR       = "ACTIVAR";
     public static final String ACCION_DESACTIVAR    = "DESACTIVAR";
     public static final String ACCION_RESPONDER     = "RESPONDER";

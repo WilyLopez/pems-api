@@ -1,6 +1,7 @@
 package com.playzone.pems.domain.finanzas.model;
 
 import com.playzone.pems.domain.finanzas.model.enums.CategoriaRetiro;
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
 import lombok.*;
 
@@ -14,7 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class MovimientoCaja {
     private Long               id;
-    private Long               idAperturaCaja;
+    private Long               idSesionCaja;
     private TipoMovimientoCaja tipo;
     private String             concepto;
     private BigDecimal         monto;
@@ -24,6 +25,13 @@ public class MovimientoCaja {
     private Long               idRegistroEgreso;
     private Long               idVenta;
     private boolean            esManual;
+    @Builder.Default
+    private NaturalezaMovimientoCaja naturaleza = NaturalezaMovimientoCaja.NORMAL;
+    private Long               idMovimientoAnulado;
     private UUID               idUsuarioRegistra;
     private OffsetDateTime      fechaCreacion;
+
+    public boolean esContraasiento() {
+        return naturaleza == NaturalezaMovimientoCaja.CONTRAASIENTO;
+    }
 }

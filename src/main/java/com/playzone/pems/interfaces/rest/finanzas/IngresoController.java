@@ -1,9 +1,12 @@
 package com.playzone.pems.interfaces.rest.finanzas;
 
+import com.playzone.pems.application.finanzas.dto.command.AnularIngresoCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarIngresoManualCommand;
 import com.playzone.pems.application.finanzas.dto.query.RegistroIngresoQuery;
 import com.playzone.pems.application.finanzas.port.in.RegistrarIngresoUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
+import com.playzone.pems.interfaces.rest.finanzas.request.AnularRegistroRequest;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarIngresoManualRequest;
 import com.playzone.pems.interfaces.rest.finanzas.response.RegistroIngresoResponse;
 import com.playzone.pems.shared.response.ApiResponse;
@@ -31,12 +34,14 @@ public class IngresoController {
 
     private final RegistrarIngresoUseCase useCase;
     private final SupabaseAuthFacade      supabaseAuthFacade;
+    private final SedeScopeValidator      sedeScope;
 
     @GetMapping("/sedes/{idSede}")
     @PreAuthorize("hasAuthority('ingreso.ver')")
     public ResponseEntity<ApiResponse<PagedResponse<RegistroIngresoResponse>>> listar(
             @PathVariable Long idSede,
             @PageableDefault(size = 20) Pageable pageable) {
+        sedeScope.validarAcceso(idSede);
         PagedResponse<RegistroIngresoResponse> body = PagedResponse.of(
                 useCase.listar(idSede, pageable).map(this::toResponse));
         return ResponseEntity.ok(ApiResponse.ok(body));
@@ -48,6 +53,7 @@ public class IngresoController {
             @PathVariable Long idSede,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        sedeScope.validarAcceso(idSede);
         if (inicio.isAfter(fin))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "inicio debe ser anterior o igual a fin");
         if (ChronoUnit.DAYS.between(inicio, fin) > 365)
@@ -57,11 +63,28 @@ public class IngresoController {
         return ResponseEntity.ok(ApiResponse.ok(body));
     }
 
+    @GetMapping("/sedes/{idSede}/tesoreria-web")
+    @PreAuthorize("hasAuthority('ingreso.ver')")
+    public ResponseEntity<ApiResponse<List<RegistroIngresoResponse>>> listarTesoreriaWeb(
+            @PathVariable Long idSede,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        sedeScope.validarAcceso(idSede);
+        if (inicio.isAfter(fin))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "inicio debe ser anterior o igual a fin");
+        if (ChronoUnit.DAYS.between(inicio, fin) > 365)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango máximo: 365 días");
+        List<RegistroIngresoResponse> body = useCase.listarTesoreriaWeb(idSede, inicio, fin)
+                .stream().map(this::toResponse).toList();
+        return ResponseEntity.ok(ApiResponse.ok(body));
+    }
+
     @PostMapping("/sedes/{idSede}")
     @PreAuthorize("hasAuthority('ingreso.crear')")
     public ResponseEntity<ApiResponse<RegistroIngresoResponse>> registrar(
             @PathVariable Long idSede,
             @Valid @RequestBody RegistrarIngresoManualRequest request) {
+        sedeScope.validarAcceso(idSede);
         RegistroIngresoQuery query = useCase.registrar(RegistrarIngresoManualCommand.builder()
                 .tipoIngresoCodigo(request.getTipoIngresoCodigo())
                 .idSede(idSede)
@@ -75,11 +98,18 @@ public class IngresoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(toResponse(query)));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/{id}/anular")
     @PreAuthorize("hasAuthority('ingreso.eliminar')")
-    public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
-        useCase.eliminar(id);
-        return ResponseEntity.ok(ApiResponse.noContent());
+    public ResponseEntity<ApiResponse<RegistroIngresoResponse>> anular(
+            @PathVariable Long id,
+            @Valid @RequestBody AnularRegistroRequest request) {
+        RegistroIngresoQuery query = useCase.anular(AnularIngresoCommand.builder()
+                .idIngreso(id)
+                .motivo(request.getMotivo())
+                .idUsuarioAnula(supabaseAuthFacade.usuarioActualId()
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No autenticado")))
+                .build());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(toResponse(query)));
     }
 
     private RegistroIngresoResponse toResponse(RegistroIngresoQuery q) {
@@ -91,9 +121,12 @@ public class IngresoController {
                 .idEventoPrivado(q.getIdEventoPrivado())
                 .monto(q.getMonto())
                 .fecha(q.getFecha())
+                .fechaCobro(q.getFechaCobro())
                 .medioPago(q.getMedioPago())
                 .descripcion(q.getDescripcion())
                 .esAutomatico(q.isEsAutomatico())
+                .naturaleza(q.getNaturaleza())
+                .idRegistroAnulado(q.getIdRegistroAnulado())
                 .fechaCreacion(q.getFechaCreacion())
                 .build();
     }

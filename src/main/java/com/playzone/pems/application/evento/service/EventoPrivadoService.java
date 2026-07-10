@@ -47,8 +47,10 @@ import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.venta.model.Venta;
 import com.playzone.pems.domain.venta.model.VentaPago;
+import com.playzone.pems.application.finanzas.service.EnrutadorCajaService;
 import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
 import com.playzone.pems.domain.venta.repository.VentaRepository;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
@@ -101,8 +103,10 @@ public class EventoPrivadoService
     private final EventoCuotaRepository           cuotaRepository;
     private final ChecklistEventoRepository       checklistRepository;
     private final PerfilUsuarioRepository          perfilUsuarioRepository;
+    private final EnrutadorCajaService             enrutadorCajaService;
     private final RegistrarLogUseCase              auditoria;
     private final CrearNotificacionPort            crearNotificacionPort;
+    private final SedeScopeValidator               sedeScope;
 
     // ─── Consultas ────────────────────────────────────────────────────────────
 
@@ -113,6 +117,8 @@ public class EventoPrivadoService
             LocalDate fechaDesde, LocalDate fechaHasta,
             String tipoEvento, String modalidadPago,
             String search, Pageable pageable) {
+
+        sedeScope.validarAccesoFiltro(idSede);
 
         EstadoEventoPrivado estadoEnum = null;
         if (estado != null && !estado.isBlank()) {
@@ -133,6 +139,7 @@ public class EventoPrivadoService
     @Override
     @Transactional(readOnly = true)
     public KpisEventosQuery kpis(Long idSede) {
+        sedeScope.validarAccesoFiltro(idSede);
         LocalDate hoy = LocalDate.now();
         LocalDate inicioMes = hoy.withDayOfMonth(1);
         LocalDate finMes = hoy.withDayOfMonth(hoy.lengthOfMonth());
@@ -155,6 +162,7 @@ public class EventoPrivadoService
     @Override
     @Transactional(readOnly = true)
     public Page<EventoPrivadoQuery> consultarPorSedeYEstado(Long idSede, String estado, Pageable pageable) {
+        sedeScope.validarAcceso(idSede);
         return eventoRepository.findBySedeAndEstado(idSede, EstadoEventoPrivado.valueOf(estado), pageable)
                 .map(e -> toQuery(e, obtenerCliente(e.getIdCliente()), obtenerTurno(e.getIdTurno()), false));
     }
@@ -162,6 +170,7 @@ public class EventoPrivadoService
     @Override
     @Transactional(readOnly = true)
     public Page<EventoPrivadoQuery> consultarPorSedeYRangoFechas(Long idSede, LocalDate inicio, LocalDate fin, Pageable pageable) {
+        sedeScope.validarAcceso(idSede);
         return eventoRepository.findBySedeAndFechasBetween(idSede, inicio, fin, pageable)
                 .map(e -> toQuery(e, obtenerCliente(e.getIdCliente()), obtenerTurno(e.getIdTurno()), false));
     }
@@ -170,6 +179,9 @@ public class EventoPrivadoService
     @Transactional(readOnly = true)
     public EventoPrivadoQuery consultarPorId(Long idEvento) {
         EventoPrivado e = obtenerEvento(idEvento);
+        if (!supabaseAuthFacade.tieneRol("CLIENTE")) {
+            sedeScope.validarAcceso(e.getIdSede());
+        }
         return toQuery(e, obtenerCliente(e.getIdCliente()), obtenerTurno(e.getIdTurno()), true);
     }
 
@@ -178,6 +190,9 @@ public class EventoPrivadoService
     @Override
     @Transactional
     public EventoPrivadoQuery ejecutar(SolicitarEventoPrivadoCommand command) {
+        if (!supabaseAuthFacade.tieneRol("CLIENTE")) {
+            sedeScope.validarAcceso(command.getIdSede());
+        }
         validarTipoEvento(command.getTipoEvento());
         validarFechaEvento(command.getIdSede(), command.getFechaEvento());
         validarTurnoEvento(command.getIdSede(), command.getFechaEvento(), command.getIdTurno());
@@ -246,6 +261,7 @@ public class EventoPrivadoService
     @Transactional
     public EventoPrivadoQuery ejecutar(ConfirmarEventoCommand command) {
         EventoPrivado evento = obtenerEvento(command.getIdEvento());
+        sedeScope.validarAcceso(evento.getIdSede());
 
         if (evento.getEstado() != EstadoEventoPrivado.SOLICITADA) {
             throw new ValidationException("Solo se pueden confirmar eventos en estado SOLICITADA.");
@@ -253,12 +269,17 @@ public class EventoPrivadoService
 
         String modalidad = command.getModalidadPago() != null ? command.getModalidadPago() : "AL_CONTADO";
 
+        BigDecimal adelanto = command.getMontoAdelanto() != null
+                ? command.getMontoAdelanto() : BigDecimal.ZERO;
+
+        if (adelanto.compareTo(command.getPrecioTotal()) > 0) {
+            throw new ValidationException("montoAdelanto",
+                    "El adelanto no puede superar el precio total del contrato.");
+        }
+
         if ("CUOTAS".equals(modalidad)) {
             validarParametrosCuotas(command);
         }
-
-        BigDecimal adelanto = command.getMontoAdelanto() != null
-                ? command.getMontoAdelanto() : BigDecimal.ZERO;
 
         EventoPrivado confirmado = evento.toBuilder()
                 .estado(EstadoEventoPrivado.CONFIRMADA)
@@ -350,7 +371,9 @@ public class EventoPrivadoService
                     ") no coincide con el monto de la cuota (" + cuota.getMonto() + ").");
         }
 
-        EventoPrivado evento = obtenerEvento(cuota.getEventoId());
+        EventoPrivado evento = eventoRepository.findByIdForUpdate(cuota.getEventoId())
+                .orElseThrow(() -> new ResourceNotFoundException("EventoPrivado", cuota.getEventoId()));
+        sedeScope.validarAcceso(evento.getIdSede());
 
         Venta ventaSaldo = crearVenta(evento, "SALDO_EVENTO", totalPago, command.getIdUsuario());
         registrarPagos(ventaSaldo.getId(), command.getPagos(), command.getIdUsuario());
@@ -366,7 +389,12 @@ public class EventoPrivadoService
         EventoPrivado actualizado = evento.toBuilder().montoAdelanto(nuevoAdelanto).build();
         EventoPrivado guardado = eventoRepository.save(actualizado);
 
-        return toQuery(guardado, obtenerCliente(guardado.getIdCliente()), obtenerTurno(guardado.getIdTurno()), true);
+        ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
+        if (cliente.getCorreo() != null) {
+            BigDecimal saldoRestante = guardado.getPrecioContrato().subtract(guardado.getMontoAdelanto());
+            notificacionPort.notificarAbonoRecibido(cliente.getCorreo(), toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false), totalPago, saldoRestante);
+        }
+        return toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), true);
     }
 
     // ─── Registrar saldo (pago libre, sin cuotas) ─────────────────────────────
@@ -374,7 +402,21 @@ public class EventoPrivadoService
     @Override
     @Transactional
     public EventoPrivadoQuery registrarSaldo(RegistrarSaldoCommand command) {
-        EventoPrivado evento = obtenerEvento(command.getIdEvento());
+        EventoPrivado evento = eventoRepository.findByIdForUpdate(command.getIdEvento())
+                .orElseThrow(() -> new ResourceNotFoundException("EventoPrivado", command.getIdEvento()));
+        sedeScope.validarAcceso(evento.getIdSede());
+
+        if (command.getMonto() == null || command.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidationException("monto", "El monto del saldo debe ser mayor a 0.");
+        }
+        if (evento.getPrecioContrato() == null) {
+            throw new ValidationException("El evento aun no tiene un precio de contrato definido.");
+        }
+        BigDecimal saldoPendiente = evento.calcularMontoSaldo();
+        if (command.getMonto().compareTo(saldoPendiente) > 0) {
+            throw new ValidationException("monto",
+                    "El monto (" + command.getMonto() + ") supera el saldo pendiente (" + saldoPendiente + ").");
+        }
 
         Venta ventaSaldo = crearVenta(evento, "SALDO_EVENTO", command.getMonto(), command.getIdUsuario());
         ventaPagoRepository.save(VentaPago.builder()
@@ -385,6 +427,9 @@ public class EventoPrivadoService
                 .validadoPor(command.getIdUsuario())
                 .validadoAt(OffsetDateTime.now())
                 .build());
+        enrutadorCajaService.registrarIngresoEfectivoAdministrativo(
+                command.getIdUsuario(), command.getMedioPago(), command.getMonto(),
+                "Saldo evento #" + evento.getId(), ventaSaldo.getId());
 
         BigDecimal nuevoAdelanto = evento.getMontoAdelanto().add(command.getMonto());
         EventoPrivado guardado = eventoRepository.save(evento.toBuilder().montoAdelanto(nuevoAdelanto).build());
@@ -399,7 +444,12 @@ public class EventoPrivadoService
                     .build());
         }
 
-        return toQuery(guardado, obtenerCliente(guardado.getIdCliente()), obtenerTurno(guardado.getIdTurno()), false);
+        ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
+        if (cliente.getCorreo() != null) {
+            BigDecimal saldoRestante = guardado.getPrecioContrato().subtract(guardado.getMontoAdelanto());
+            notificacionPort.notificarAbonoRecibido(cliente.getCorreo(), toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false), command.getMonto(), saldoRestante);
+        }
+        return toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false);
     }
 
     // ─── Completar ────────────────────────────────────────────────────────────
@@ -408,6 +458,7 @@ public class EventoPrivadoService
     @Transactional
     public EventoPrivadoQuery completar(Long idEvento, UUID idUsuarioGestor) {
         EventoPrivado evento = obtenerEvento(idEvento);
+        sedeScope.validarAcceso(evento.getIdSede());
         if (evento.getEstado() != EstadoEventoPrivado.CONFIRMADA) {
             throw new ValidationException("Solo se pueden completar eventos en estado CONFIRMADA.");
         }
@@ -435,6 +486,7 @@ public class EventoPrivadoService
     @Transactional
     public EventoPrivadoQuery ejecutar(Long idEvento, String motivoCancelacion) {
         EventoPrivado evento = obtenerEvento(idEvento);
+        sedeScope.validarAcceso(evento.getIdSede());
 
         if (!evento.puedeCancelarse()) {
             throw new ValidationException("El evento no puede cancelarse en su estado actual.");
@@ -566,14 +618,19 @@ public class EventoPrivadoService
     }
 
     private void registrarPagos(Long ventaId, List<VentaPagoItem> pagos, UUID idUsuario) {
-        pagos.forEach(p -> ventaPagoRepository.save(VentaPago.builder()
-                .ventaId(ventaId)
-                .medioPagoCodigo(p.getMedioPagoCodigo())
-                .monto(p.getMonto())
-                .esValidado(true)
-                .validadoPor(idUsuario)
-                .validadoAt(OffsetDateTime.now())
-                .build()));
+        pagos.forEach(p -> {
+            ventaPagoRepository.save(VentaPago.builder()
+                    .ventaId(ventaId)
+                    .medioPagoCodigo(p.getMedioPagoCodigo())
+                    .monto(p.getMonto())
+                    .esValidado(true)
+                    .validadoPor(idUsuario)
+                    .validadoAt(OffsetDateTime.now())
+                    .build());
+            enrutadorCajaService.registrarIngresoEfectivoAdministrativo(
+                    idUsuario, p.getMedioPagoCodigo(), p.getMonto(),
+                    "Cobro evento venta #" + ventaId, ventaId);
+        });
     }
 
     // ─── Validaciones ─────────────────────────────────────────────────────────

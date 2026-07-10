@@ -11,7 +11,7 @@ import java.util.UUID;
 @Builder
 public class ArqueoCajaQuery {
     private Long           id;
-    private Long           idAperturaCaja;
+    private Long           idSesionCaja;
     private BigDecimal     saldoEsperado;
     private BigDecimal     saldoContado;
     private BigDecimal     diferencia;

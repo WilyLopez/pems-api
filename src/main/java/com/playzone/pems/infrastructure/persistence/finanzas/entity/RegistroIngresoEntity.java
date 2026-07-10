@@ -1,5 +1,6 @@
 package com.playzone.pems.infrastructure.persistence.finanzas.entity;
 
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.infrastructure.persistence.usuario.entity.SedeEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -50,6 +51,9 @@ public class RegistroIngresoEntity {
     @Column(name = "fecha", nullable = false)
     private LocalDate fecha;
 
+    @Column(name = "fecha_cobro", nullable = false)
+    private LocalDate fechaCobro;
+
     @Column(name = "medio_pago_codigo", length = 30)
     private String medioPagoCodigo;
 
@@ -62,6 +66,14 @@ public class RegistroIngresoEntity {
     @Column(name = "es_automatico", nullable = false)
     @Builder.Default
     private boolean esAutomatico = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "naturaleza", nullable = false, length = 20)
+    @Builder.Default
+    private NaturalezaMovimientoCaja naturaleza = NaturalezaMovimientoCaja.NORMAL;
+
+    @Column(name = "registro_anulado_id", updatable = false)
+    private Long registroAnuladoId;
 
     @Column(name = "created_by", columnDefinition = "uuid")
     private UUID createdBy;

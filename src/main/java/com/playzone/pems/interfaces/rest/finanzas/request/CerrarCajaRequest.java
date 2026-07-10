@@ -1,5 +1,8 @@
 package com.playzone.pems.interfaces.rest.finanzas.request;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -9,6 +12,10 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class CerrarCajaRequest {
 
+    @NotNull(message = "El conteo fisico del efectivo es obligatorio.")
+    @PositiveOrZero
+    @Digits(integer = 10, fraction = 2)
     private BigDecimal saldoFinal;
-    private String     observaciones;
+
+    private String observaciones;
 }

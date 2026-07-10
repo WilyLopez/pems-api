@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reserva Recibida - Kiki y Lala</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f7ff;font-family:Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f7ff;padding:24px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);max-width:500px;width:100%;">
+                <tr>
+                    <td style="background:#00AEEF;padding:20px;text-align:center;">
+                        <h2 style="color:#ffffff;margin:0;font-size:20px;font-weight:700;">Reserva Recibida</h2>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:24px;color:#334155;font-size:15px;line-height:1.5;">
+                        <p style="margin-top:0;">Hola <strong>{{nombreCliente}}</strong>,</p>
+                        <p>Hemos recibido tu solicitud de reserva para la zona de juegos de Kiki y Lala. Tu pago se encuentra actualmente en <strong>proceso de validacion</strong>.</p>
+                        
+                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:20px 0;">
+                            <p style="margin:0 0 6px 0;font-size:12px;color:#64748b;">Numero de Ticket</p>
+                            <p style="margin:0 0 12px 0;font-size:16px;font-weight:700;color:#00AEEF;font-family:monospace;">{{numeroTicket}}</p>
+                            
+                            <p style="margin:0 0 6px 0;font-size:12px;color:#64748b;">Fecha Reservada</p>
+                            <p style="margin:0 0 12px 0;font-size:15px;font-weight:700;">{{fecha}}</p>
+                            
+                            <p style="margin:0 0 6px 0;font-size:12px;color:#64748b;">Monto Pendiente</p>
+                            <p style="margin:0;font-size:15px;font-weight:700;color:#15803d;">S/ {{total}}</p>
+                        </div>
+                        
+                        <p style="color:#92400e;background:#fffbeb;border:1px solid #fef3c7;border-radius:6px;padding:12px;font-size:13px;line-height:1.4;margin:16px 0;">
+                            <strong>Aviso importante:</strong> Tu reserva aun no esta confirmada. Nuestro equipo revisara el comprobante adjunto y recibiras un nuevo correo electronico cuando el pago sea aprobado o rechazado.
+                        </p>
+                        
+                        <p style="color:#64748b;font-size:12px;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px;text-align:center;">
+                            Kiki y Lala - Chiclayo, Peru
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

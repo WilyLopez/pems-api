@@ -37,6 +37,10 @@ public class ReservaPublicaPersistenceAdapter implements ReservaPublicaRepositor
         return reservaJpa.findById(id).map(mapper::toDomain);
     }
 
+    @Override public Optional<ReservaPublica> findByIdForUpdate(Long id) {
+        return reservaJpa.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
     @Override public Optional<ReservaPublica> findByNumeroTicket(String ticket) {
         return reservaJpa.findByNumeroTicket(ticket).map(mapper::toDomain);
     }

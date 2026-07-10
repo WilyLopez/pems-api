@@ -1,5 +1,7 @@
 package com.playzone.pems.infrastructure.persistence.finanzas.entity;
 
+import com.playzone.pems.domain.finanzas.model.enums.EstadoAprobacionEgreso;
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.infrastructure.persistence.usuario.entity.SedeEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,6 +58,28 @@ public class RegistroEgresoEntity {
     @Column(name = "es_recurrente", nullable = false)
     @Builder.Default
     private boolean esRecurrente = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "naturaleza", nullable = false, length = 20)
+    @Builder.Default
+    private NaturalezaMovimientoCaja naturaleza = NaturalezaMovimientoCaja.NORMAL;
+
+    @Column(name = "registro_anulado_id", updatable = false)
+    private Long registroAnuladoId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_aprobacion", nullable = false, length = 30)
+    @Builder.Default
+    private EstadoAprobacionEgreso estadoAprobacion = EstadoAprobacionEgreso.APROBADO;
+
+    @Column(name = "aprobado_por", columnDefinition = "uuid")
+    private UUID aprobadoPor;
+
+    @Column(name = "fecha_aprobacion")
+    private OffsetDateTime fechaAprobacion;
+
+    @Column(name = "motivo_rechazo", length = 300)
+    private String motivoRechazo;
 
     @Column(name = "created_by", columnDefinition = "uuid")
     private UUID createdBy;

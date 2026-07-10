@@ -252,7 +252,7 @@ public class EventoPrivadoController {
             @PathVariable Long idEvento,
             @PathVariable Long idChecklist) {
         return ResponseEntity.ok(ApiResponse.ok(
-                checklistUseCase.completar(idChecklist, usuarioActual())));
+                checklistUseCase.completar(idEvento, idChecklist, usuarioActual())));
     }
 
     @PostMapping("/{idEvento}/checklist/{idChecklist}/descompletar")
@@ -260,7 +260,7 @@ public class EventoPrivadoController {
     public ResponseEntity<ApiResponse<ChecklistEventoQuery>> descompletarTarea(
             @PathVariable Long idEvento,
             @PathVariable Long idChecklist) {
-        return ResponseEntity.ok(ApiResponse.ok(checklistUseCase.descompletar(idChecklist)));
+        return ResponseEntity.ok(ApiResponse.ok(checklistUseCase.descompletar(idEvento, idChecklist)));
     }
 
     @PostMapping("/{idEvento}/checklist")
@@ -280,7 +280,7 @@ public class EventoPrivadoController {
     public ResponseEntity<ApiResponse<Void>> eliminarTarea(
             @PathVariable Long idEvento,
             @PathVariable Long idChecklist) {
-        checklistUseCase.eliminarTarea(idChecklist);
+        checklistUseCase.eliminarTarea(idEvento, idChecklist);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 

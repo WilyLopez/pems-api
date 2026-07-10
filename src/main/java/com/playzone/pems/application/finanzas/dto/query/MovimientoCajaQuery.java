@@ -1,6 +1,7 @@
 package com.playzone.pems.application.finanzas.dto.query;
 
 import com.playzone.pems.domain.finanzas.model.enums.CategoriaRetiro;
+import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
 import lombok.Builder;
 import lombok.Getter;
@@ -12,7 +13,7 @@ import java.time.OffsetDateTime;
 @Builder
 public class MovimientoCajaQuery {
     private Long               id;
-    private Long               idAperturaCaja;
+    private Long               idSesionCaja;
     private TipoMovimientoCaja tipo;
     private String             concepto;
     private BigDecimal         monto;
@@ -22,5 +23,7 @@ public class MovimientoCajaQuery {
     private Long               idRegistroEgreso;
     private Long               idVenta;
     private boolean            esManual;
+    private NaturalezaMovimientoCaja naturaleza;
+    private Long               idMovimientoAnulado;
     private OffsetDateTime      fechaCreacion;
 }

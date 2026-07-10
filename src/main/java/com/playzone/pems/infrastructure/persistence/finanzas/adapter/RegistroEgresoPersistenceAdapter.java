@@ -36,6 +36,22 @@ public class RegistroEgresoPersistenceAdapter implements RegistroEgresoRepositor
     }
 
     @Override
+    public Optional<RegistroEgreso> findByIdForUpdate(Long id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public boolean existsAnuladoPara(Long idRegistroOriginal) {
+        return jpaRepository.existsByRegistroAnuladoId(idRegistroOriginal);
+    }
+
+    @Override
+    public List<RegistroEgreso> findPendientesAprobacion(Long idSede) {
+        return jpaRepository.findPendientesAprobacion(idSede)
+                .stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public Page<RegistroEgreso> findBySede(Long idSede, Pageable pageable) {
         return jpaRepository.findBySede_IdWithTipo(idSede, pageable).map(mapper::toDomain);
     }
@@ -97,11 +113,18 @@ public class RegistroEgresoPersistenceAdapter implements RegistroEgresoRepositor
                 .sede(sede)
                 .monto(registro.getMonto())
                 .fecha(registro.getFecha())
+                .medioPagoCodigo(registro.getMedioPago())
                 .periodoAnio(registro.getPeriodoAnio())
                 .periodoMes(registro.getPeriodoMes())
                 .descripcion(registro.getDescripcion())
                 .comprobantePath(registro.getComprobanteUrl())
                 .esRecurrente(registro.isEsRecurrente())
+                .naturaleza(registro.getNaturaleza())
+                .registroAnuladoId(registro.getIdRegistroAnulado())
+                .estadoAprobacion(registro.getEstadoAprobacion())
+                .aprobadoPor(registro.getAprobadoPor())
+                .fechaAprobacion(registro.getFechaAprobacion())
+                .motivoRechazo(registro.getMotivoRechazo())
                 .createdBy(registro.getIdUsuarioRegistra())
                 .build();
         return mapper.toDomain(jpaRepository.save(entity));

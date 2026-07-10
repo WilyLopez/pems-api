@@ -30,9 +30,8 @@ public class ChecklistEventoService implements GestionarChecklistUseCase {
 
     @Override
     @Transactional
-    public ChecklistEventoQuery completar(Long idChecklist, UUID idUsuarioAdmin) {
-        ChecklistEvento item = checklistRepository.findById(idChecklist)
-                .orElseThrow(() -> new ResourceNotFoundException("ChecklistEvento", idChecklist));
+    public ChecklistEventoQuery completar(Long idEvento, Long idChecklist, UUID idUsuarioAdmin) {
+        ChecklistEvento item = obtenerDelEvento(idEvento, idChecklist);
 
         if (item.isCompletada()) {
             throw new ValidationException("La tarea ya esta marcada como completada.");
@@ -47,9 +46,8 @@ public class ChecklistEventoService implements GestionarChecklistUseCase {
 
     @Override
     @Transactional
-    public ChecklistEventoQuery descompletar(Long idChecklist) {
-        ChecklistEvento item = checklistRepository.findById(idChecklist)
-                .orElseThrow(() -> new ResourceNotFoundException("ChecklistEvento", idChecklist));
+    public ChecklistEventoQuery descompletar(Long idEvento, Long idChecklist) {
+        ChecklistEvento item = obtenerDelEvento(idEvento, idChecklist);
 
         return toQuery(checklistRepository.save(item.toBuilder()
                 .completada(false)
@@ -79,10 +77,18 @@ public class ChecklistEventoService implements GestionarChecklistUseCase {
 
     @Override
     @Transactional
-    public void eliminarTarea(Long idChecklist) {
-        checklistRepository.findById(idChecklist)
-                .orElseThrow(() -> new ResourceNotFoundException("ChecklistEvento", idChecklist));
+    public void eliminarTarea(Long idEvento, Long idChecklist) {
+        obtenerDelEvento(idEvento, idChecklist);
         checklistRepository.deleteById(idChecklist);
+    }
+
+    private ChecklistEvento obtenerDelEvento(Long idEvento, Long idChecklist) {
+        ChecklistEvento item = checklistRepository.findById(idChecklist)
+                .orElseThrow(() -> new ResourceNotFoundException("ChecklistEvento", idChecklist));
+        if (!item.getIdEventoPrivado().equals(idEvento)) {
+            throw new ValidationException("La tarea de checklist no pertenece al evento indicado.");
+        }
+        return item;
     }
 
     private ChecklistEventoQuery toQuery(ChecklistEvento c) {

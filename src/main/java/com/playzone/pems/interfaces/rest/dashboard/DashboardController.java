@@ -2,6 +2,7 @@ package com.playzone.pems.interfaces.rest.dashboard;
 
 import com.playzone.pems.application.dashboard.dto.query.DashboardAdminQuery;
 import com.playzone.pems.application.dashboard.port.in.ConsultarDashboardAdminUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.interfaces.rest.dashboard.response.DashboardAdminResponse;
 import com.playzone.pems.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,11 +16,13 @@ import org.springframework.web.bind.annotation.*;
 public class DashboardController {
 
     private final ConsultarDashboardAdminUseCase useCase;
+    private final SedeScopeValidator             sedeScope;
 
     @GetMapping("/sedes/{idSede}/resumen")
     @PreAuthorize("hasAuthority('dashboard.ver')")
     public ResponseEntity<ApiResponse<DashboardAdminResponse>> resumen(
             @PathVariable Long idSede) {
+        sedeScope.validarAcceso(idSede);
         return ResponseEntity.ok(ApiResponse.ok(toResponse(useCase.obtener(idSede))));
     }
 

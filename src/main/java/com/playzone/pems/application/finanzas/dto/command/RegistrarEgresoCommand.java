@@ -14,6 +14,7 @@ public class RegistrarEgresoCommand {
     private Long       idSede;
     private BigDecimal monto;
     private LocalDate  fecha;
+    private String     medioPago;
     private Integer    periodoAnio;
     private Integer    periodoMes;
     private String     descripcion;

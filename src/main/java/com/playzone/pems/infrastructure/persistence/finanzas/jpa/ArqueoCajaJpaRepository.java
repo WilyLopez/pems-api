@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface ArqueoCajaJpaRepository extends JpaRepository<ArqueoCajaEntity, Long> {
 
-    List<ArqueoCajaEntity> findByAperturaCaja_IdOrderByFechaCreacionAsc(Long idAperturaCajaId);
+    List<ArqueoCajaEntity> findBySesionCaja_IdOrderByFechaCreacionAsc(Long idSesionCaja);
 }

@@ -1,17 +1,17 @@
 package com.playzone.pems.interfaces.rest.venta;
 
-import com.playzone.pems.application.venta.dto.command.ProcesarVentaCommand;
+import com.playzone.pems.application.evento.service.ReservaPublicaService;
 import com.playzone.pems.application.venta.dto.command.CobrarReservaCommand;
 import com.playzone.pems.application.venta.dto.command.PagoMostradorCommand;
 import com.playzone.pems.application.venta.dto.query.VentaQuery;
 import com.playzone.pems.application.venta.port.in.ConsultarVentasUseCase;
 import com.playzone.pems.application.venta.port.in.ProcesarVentaUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.infrastructure.pdf.NotaVentaPdfService;
 import com.playzone.pems.application.venta.dto.query.VentaDetalleQuery;
 import com.playzone.pems.application.evento.dto.query.ReservaPublicaQuery;
 import com.playzone.pems.interfaces.rest.evento.response.ReservaPublicaResponse;
-import com.playzone.pems.interfaces.rest.venta.request.ProcesarVentaRequest;
 import com.playzone.pems.interfaces.rest.venta.request.CobrarReservaRequest;
 import com.playzone.pems.interfaces.rest.venta.response.VentaResponse;
 import com.playzone.pems.interfaces.rest.venta.response.VentaDetalleResponse;
@@ -40,49 +40,16 @@ public class VentaController {
     private final ConsultarVentasUseCase consultarUseCase;
     private final SupabaseAuthFacade     supabaseAuthFacade;
     private final NotaVentaPdfService    notaVentaPdfService;
-
-    @PostMapping("/sedes/{idSede}")
-    @PreAuthorize("hasAuthority('pos.vender')")
-    public ResponseEntity<ApiResponse<VentaResponse>> procesar(
-            @PathVariable Long idSede,
-            @Valid @RequestBody ProcesarVentaRequest request) {
-
-        VentaQuery query = procesarUseCase.ejecutar(ProcesarVentaCommand.builder()
-                .idSede(idSede)
-                .createdBy(supabaseAuthFacade.usuarioActualId()
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no autenticado")))
-                .clienteId(request.getClienteId())
-                .eventoId(request.getEventoId())
-                .tipo(request.getTipo())
-                .canalCodigo(request.getCanalCodigo())
-                .fechaVisita(request.getFechaVisita())
-                .nombreAcompanante(request.getNombreAcompanante())
-                .dniAcompanante(request.getDniAcompanante())
-                .telefonoAcompanante(request.getTelefonoAcompanante())
-                .promocionId(request.getPromocionId())
-                .efectivoRecibido(request.getEfectivoRecibido())
-                .vuelto(request.getVuelto())
-                .actaFirmada(request.isActaFirmada())
-                .esAnticipada(request.isEsAnticipada())
-                .notas(request.getNotas())
-                .lineas(request.getLineas().stream()
-                        .map(l -> ProcesarVentaCommand.LineaVentaCommand.builder()
-                                .cantidad(l.getCantidad())
-                                .precioUnitario(l.getPrecioUnitario())
-                                .build())
-                        .toList())
-                .descuento(request.getDescuento())
-                .build());
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created(toResponse(query)));
-    }
+    private final SedeScopeValidator     sedeScope;
+    private final ReservaPublicaService  reservaPublicaService;
 
     @PostMapping("/reserva/{reservaId}/cobrar")
     @PreAuthorize("hasAuthority('pos.vender')")
     public ResponseEntity<ApiResponse<VentaResponse>> cobrarReserva(
             @PathVariable Long reservaId,
             @Valid @RequestBody CobrarReservaRequest request) {
+
+        sedeScope.validarAcceso(reservaPublicaService.consultarPorId(reservaId).getIdSede());
 
         VentaQuery query = procesarUseCase.cobrarReserva(CobrarReservaCommand.builder()
                 .reservaId(reservaId)
@@ -113,6 +80,7 @@ public class VentaController {
             @RequestParam(required = false) String search,
             Pageable pageable) {
 
+        sedeScope.validarAcceso(idSede);
         Page<VentaResponse> page = consultarUseCase.consultarPorSedeYFechas(idSede, desde, hasta, search, pageable)
                 .map(this::toResponse);
         return ResponseEntity.ok(ApiResponse.ok(page));
@@ -121,13 +89,17 @@ public class VentaController {
     @GetMapping("/{idVenta}")
     @PreAuthorize("hasAuthority('pos.vender')")
     public ResponseEntity<ApiResponse<VentaResponse>> consultar(@PathVariable Long idVenta) {
-        return ResponseEntity.ok(ApiResponse.ok(toResponse(consultarUseCase.consultarPorId(idVenta))));
+        VentaQuery query = consultarUseCase.consultarPorId(idVenta);
+        sedeScope.validarAcceso(query.getIdSede());
+        return ResponseEntity.ok(ApiResponse.ok(toResponse(query)));
     }
 
     @GetMapping("/{idVenta}/detalle")
     @PreAuthorize("hasAuthority('pos.vender')")
     public ResponseEntity<ApiResponse<VentaDetalleResponse>> consultarDetalle(@PathVariable Long idVenta) {
-        return ResponseEntity.ok(ApiResponse.ok(toDetalleResponse(consultarUseCase.consultarDetallePorId(idVenta))));
+        VentaDetalleQuery detalle = consultarUseCase.consultarDetallePorId(idVenta);
+        sedeScope.validarAcceso(detalle.getIdSede());
+        return ResponseEntity.ok(ApiResponse.ok(toDetalleResponse(detalle)));
     }
 
     @PostMapping("/{idVenta}/enviar-correo")
@@ -135,6 +107,7 @@ public class VentaController {
     public ResponseEntity<ApiResponse<Void>> enviarCorreo(
             @PathVariable Long idVenta,
             @RequestParam(required = false) String correo) {
+        sedeScope.validarAcceso(consultarUseCase.consultarPorId(idVenta).getIdSede());
         procesarUseCase.enviarCorreoVenta(idVenta, correo);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
@@ -142,6 +115,7 @@ public class VentaController {
     @PostMapping("/{idVenta}/marcar-impreso")
     @PreAuthorize("hasAuthority('pos.vender')")
     public ResponseEntity<ApiResponse<Void>> marcarImpreso(@PathVariable Long idVenta) {
+        sedeScope.validarAcceso(consultarUseCase.consultarPorId(idVenta).getIdSede());
         procesarUseCase.marcarImpreso(idVenta);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
@@ -149,6 +123,7 @@ public class VentaController {
     @PostMapping("/{idVenta}/marcar-descargado")
     @PreAuthorize("hasAuthority('pos.vender')")
     public ResponseEntity<ApiResponse<Void>> marcarDescargado(@PathVariable Long idVenta) {
+        sedeScope.validarAcceso(consultarUseCase.consultarPorId(idVenta).getIdSede());
         procesarUseCase.marcarDescargado(idVenta);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
@@ -157,6 +132,7 @@ public class VentaController {
     @PreAuthorize("hasAuthority('pos.vender')")
     public ResponseEntity<byte[]> descargarNotaVenta(@PathVariable Long idVenta) {
         VentaQuery venta = consultarUseCase.consultarPorId(idVenta);
+        sedeScope.validarAcceso(venta.getIdSede());
         byte[] pdf = notaVentaPdfService.generarNotaVentaPdf(venta, "Sede del Negocio");
 
         procesarUseCase.marcarDescargado(idVenta);

@@ -13,7 +13,7 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ArqueoCajaResponse {
     private Long           id;
-    private Long           idAperturaCaja;
+    private Long           idSesionCaja;
     private BigDecimal     saldoEsperado;
     private BigDecimal     saldoContado;
     private BigDecimal     diferencia;

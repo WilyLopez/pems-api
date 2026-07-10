@@ -36,6 +36,7 @@ import com.playzone.pems.domain.storage.StoragePort;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
 import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.util.FechaUtil;
@@ -78,6 +79,7 @@ public class ReservaPublicaService
     private final ConfiguracionGlobalRepository     configuracionGlobalRepository;
     private final RegistrarLogUseCase               auditoria;
     private final CrearNotificacionPort             crearNotificacionPort;
+    private final SedeScopeValidator                sedeScope;
 
     @org.springframework.beans.factory.annotation.Value("${supabase.storage.bucket-comprobantes:comprobantes}")
     private String bucketComprobantes;
@@ -187,9 +189,9 @@ public class ReservaPublicaService
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(command.getIdSede()), null, null);
         if (cliente.getCorreo() != null) {
-            correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), query);
+            correoPort.enviarReservaPendiente(cliente.getCorreo(), cliente.nombreCompleto(), query);
         } else {
-            log.warn("Reserva {} sin correo de cliente {}, no se envia ticket", guardada.getId(), command.getIdCliente());
+            log.warn("Reserva {} sin correo de cliente {}, no se envia aviso de pendiente", guardada.getId(), command.getIdCliente());
         }
 
         crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
@@ -215,8 +217,9 @@ public class ReservaPublicaService
     @Override
     @Transactional
     public ReservaPublicaQuery ejecutar(ReprogramarReservaCommand command) {
-        ReservaPublica original = reservaRepository.findById(command.getIdReservaOriginal())
+        ReservaPublica original = reservaRepository.findByIdForUpdate(command.getIdReservaOriginal())
                 .orElseThrow(() -> new ReservaNotFoundException(command.getIdReservaOriginal()));
+        sedeScope.validarAcceso(original.getIdSede());
 
         int maxReprogramaciones = configuracionGlobalRepository.findByClave("MAX_REPROGRAMACIONES")
                 .map(c -> { try { return Integer.parseInt(c.getValor()); } catch (NumberFormatException e) { return 1; } })
@@ -240,12 +243,46 @@ public class ReservaPublicaService
                 .build();
         reservaRepository.save(originalActualizada);
 
-        BigDecimal precio = tarifa.getPrecio();
+        BigDecimal precio        = tarifa.getPrecio();
+        BigDecimal montoYaPagado = original.getTotalPagado() != null ? original.getTotalPagado() : BigDecimal.ZERO;
+        BigDecimal diferencia    = precio.subtract(montoYaPagado);
+        boolean requierePagoAdicional = diferencia.compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal montoVenta = requierePagoAdicional ? diferencia : precio;
+
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(original.getIdCliente())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente", original.getIdCliente()));
+
+        // Si no se requiere pago adicional, la reserva queda cubierta de inmediato y necesita
+        // una venta propia para habilitar el ingreso. Si se requiere pago adicional, la venta
+        // se crea recien cuando se cobre la diferencia (VentaService.cobrarReserva).
+        Long ventaIdNueva = null;
+        if (!requierePagoAdicional) {
+            Venta ventaNueva = ventaRepository.save(Venta.builder()
+                    .idSede(original.getIdSede())
+                    .clienteId(original.getIdCliente())
+                    .tipo("RESERVA")
+                    .canalCodigo("WEB")
+                    .fechaVisita(command.getNuevaFechaEvento())
+                    .subtotal(montoVenta)
+                    .descuento(BigDecimal.ZERO)
+                    .total(montoVenta)
+                    .efectivoRecibido(BigDecimal.ZERO)
+                    .vuelto(BigDecimal.ZERO)
+                    .actaFirmada(original.isFirmoConsentimiento())
+                    .esAnticipada(true)
+                    .notas("Reprogramacion de reserva #" + original.getId()
+                            + " | precio nuevo=" + precio + " | ya pagado=" + montoYaPagado
+                            + " | sin cobro adicional")
+                    .createdBy(cliente.getUsuarioId())
+                    .build());
+            ventaIdNueva = ventaNueva.getId();
+        }
 
         ReservaPublica nueva = ReservaPublica.builder()
+                .ventaId(ventaIdNueva)
                 .idCliente(original.getIdCliente())
                 .idSede(original.getIdSede())
-                .estado(EstadoReservaPublica.PENDIENTE)
+                .estado(requierePagoAdicional ? EstadoReservaPublica.PENDIENTE : EstadoReservaPublica.CONFIRMADA)
                 .canalReserva(original.getCanalReserva())
                 .tipoDia(tipoDia)
                 .idReservaOriginal(original.getId())
@@ -254,7 +291,7 @@ public class ReservaPublicaService
                 .fechaEvento(command.getNuevaFechaEvento())
                 .precioHistorico(precio)
                 .descuentoAplicado(BigDecimal.ZERO)
-                .totalPagado(precio)
+                .totalPagado(montoVenta)
                 .nombreNino(original.getNombreNino())
                 .edadNino(original.getEdadNino())
                 .nombreAcompanante(original.getNombreAcompanante())
@@ -264,15 +301,16 @@ public class ReservaPublicaService
 
         ReservaPublica guardada = reservaRepository.save(nueva);
 
-        ClientePerfil cliente = clientePerfilRepository.buscarPorId(guardada.getIdCliente())
-                .orElseThrow(() -> new ResourceNotFoundException("Cliente", guardada.getIdCliente()));
-
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(guardada.getIdSede()), null, null);
         if (cliente.getCorreo() != null) {
-            correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), query);
+            if (requierePagoAdicional) {
+                correoPort.enviarReservaPendiente(cliente.getCorreo(), cliente.nombreCompleto(), query);
+            } else {
+                correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), query);
+            }
         } else {
-            log.warn("Reprogramacion {} sin correo de cliente {}, no se envia ticket", guardada.getId(), guardada.getIdCliente());
+            log.warn("Reprogramacion {} sin correo de cliente {}, no se envia notificacion", guardada.getId(), guardada.getIdCliente());
         }
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
@@ -280,7 +318,8 @@ public class ReservaPublicaService
                 AuditoriaConstants.ACCION_REPROGRAMAR, AuditoriaConstants.MOD_RESERVAS,
                 "ReservaPublica", guardada.getId(),
                 "reservaOriginal=" + command.getIdReservaOriginal(), "nuevaFecha=" + command.getNuevaFechaEvento(),
-                "Reserva #" + command.getIdReservaOriginal() + " reprogramada → nueva reserva #" + guardada.getId(),
+                "Reserva #" + command.getIdReservaOriginal() + " reprogramada -> nueva reserva #" + guardada.getId()
+                        + " | precioNuevo=" + precio + " | yaPagado=" + montoYaPagado + " | diferencia=" + diferencia,
                 null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
 
         return query;
@@ -291,6 +330,7 @@ public class ReservaPublicaService
     public ReservaPublicaQuery ejecutar(Long idReserva, String motivo) {
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(reserva.getIdSede());
 
         if (!reserva.puedeCancelarse()) {
             throw new ValidationException("La reserva no puede cancelarse en su estado actual.");
@@ -314,14 +354,19 @@ public class ReservaPublicaService
                 "Reserva #" + idReserva + " cancelada: " + motivo,
                 null, null, AuditoriaConstants.NIVEL_CRITICAL, AuditoriaConstants.RESULTADO_EXITOSO));
 
-        return toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
+        ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(guardada.getIdSede()), null, null);
+        if (cliente.getCorreo() != null) {
+            correoPort.enviarReservaCancelada(cliente.getCorreo(), cliente.nombreCompleto(), query, motivo);
+        }
+        return query;
     }
 
     @Transactional
     public ReservaPublicaQuery confirmarPago(Long idReserva, String medioPago) {
-        ReservaPublica reserva = reservaRepository.findById(idReserva)
+        ReservaPublica reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(reserva.getIdSede());
         if (reserva.getEstado() != EstadoReservaPublica.PENDIENTE) {
             throw new ValidationException("Solo se pueden confirmar reservas en estado PENDIENTE.");
         }
@@ -349,13 +394,19 @@ public class ReservaPublicaService
                         "fecha", guardada.getFechaEvento().toString()))
                 .build());
 
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(guardada.getIdCliente())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente", guardada.getIdCliente()));
+        if (cliente.getCorreo() != null) {
+            correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), enriquecerQuery(guardada));
+        }
         return enriquecerQuery(guardada);
     }
 
     @Transactional
     public ReservaPublicaQuery rechazarPago(Long idReserva, String motivo) {
-        ReservaPublica reserva = reservaRepository.findById(idReserva)
+        ReservaPublica reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(reserva.getIdSede());
         if (reserva.getEstado() != EstadoReservaPublica.PENDIENTE) {
             throw new ValidationException("Solo se pueden rechazar pagos de reservas en estado PENDIENTE.");
         }
@@ -379,6 +430,11 @@ public class ReservaPublicaService
                         "fecha", reserva.getFechaEvento().toString()))
                 .build());
 
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(reserva.getIdCliente())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente", reserva.getIdCliente()));
+        if (cliente.getCorreo() != null) {
+            correoPort.enviarReservaRechazada(cliente.getCorreo(), cliente.nombreCompleto(), enriquecerQuery(reserva), motivo);
+        }
         return enriquecerQuery(reserva);
     }
 
@@ -389,22 +445,13 @@ public class ReservaPublicaService
             byte[] bytes = archivo.getBytes();
             String key = "comprobantes/" + UUID.randomUUID() + "_" + archivo.getOriginalFilename();
             String mime = archivo.getContentType() != null ? archivo.getContentType() : "application/octet-stream";
-            try {
-                url = storagePort.upload(bucketComprobantes, key, bytes, mime);
-            } catch (Exception e) {
-                if (e.getClass().getSimpleName().equals("NoSuchBucketException") ||
-                    (e.getMessage() != null && (e.getMessage().contains("Bucket not found") || e.getMessage().contains("NoSuchBucket")))) {
-                    log.warn("Bucket '{}' no encontrado, reintentando con '{}'", bucketComprobantes, bucketPublico);
-                    url = storagePort.upload(bucketPublico, key, bytes, mime);
-                } else {
-                    throw e;
-                }
-            }
+            url = storagePort.upload(bucketComprobantes, key, bytes, mime);
         } catch (IOException e) {
             throw new RuntimeException("No se pudo leer el comprobante", e);
         }
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(reserva.getIdSede());
 
         var pagosExistentes = ventaPagoRepository.findByVentaId(reserva.getVentaId());
         boolean actualizado = false;

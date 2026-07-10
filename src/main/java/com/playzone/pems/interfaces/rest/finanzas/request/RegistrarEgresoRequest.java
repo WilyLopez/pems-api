@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -24,6 +25,11 @@ public class RegistrarEgresoRequest {
 
     @NotNull
     private LocalDate fecha;
+
+    @NotBlank(message = "El medio de pago es obligatorio.")
+    @Pattern(regexp = "EFECTIVO|YAPE|TARJETA|PLIN|TRANSFERENCIA",
+            message = "Medio de pago no valido.")
+    private String medioPago;
 
     private Integer periodoAnio;
     private Integer periodoMes;

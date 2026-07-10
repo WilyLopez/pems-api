@@ -2,6 +2,7 @@ package com.playzone.pems.interfaces.rest.finanzas;
 
 import com.playzone.pems.application.finanzas.dto.query.DashboardFinancieroQuery;
 import com.playzone.pems.application.finanzas.port.in.ConsultarDashboardFinancieroUseCase;
+import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.interfaces.rest.finanzas.response.DashboardFinancieroResponse;
 import com.playzone.pems.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class DashboardFinancieroController {
 
     private final ConsultarDashboardFinancieroUseCase useCase;
+    private final SedeScopeValidator                  sedeScope;
 
     @GetMapping("/sedes/{idSede}")
     @PreAuthorize("hasAuthority('finanzas.ver')")
@@ -22,6 +24,7 @@ public class DashboardFinancieroController {
             @PathVariable Long idSede,
             @RequestParam int anio,
             @RequestParam int mes) {
+        sedeScope.validarAcceso(idSede);
         return ResponseEntity.ok(ApiResponse.ok(toResponse(useCase.consultar(idSede, anio, mes))));
     }
 
