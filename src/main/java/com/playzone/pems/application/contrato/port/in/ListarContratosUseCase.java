@@ -7,8 +7,6 @@ import java.time.LocalDate;
 
 public interface ListarContratosUseCase {
     ContratoPageQuery ejecutar(
-        String    search,
-        String    estado,
         Long      idSede,
         LocalDate fechaEvento,
         Pageable  pageable
