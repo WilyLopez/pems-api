@@ -15,9 +15,5 @@ public interface ContratoRepository {
 
     Contrato save(Contrato contrato);
 
-    boolean existsByEventoPrivado(Long idEventoPrivado);
-
-    boolean existsById(Long id);
-
-    Page<Contrato> buscarConFiltros(String search, String estado, Long idSede, LocalDate fechaEvento, Pageable pageable);
+    Page<Contrato> buscarConFiltros(Long idSede, LocalDate fechaEvento, Pageable pageable);
 }
