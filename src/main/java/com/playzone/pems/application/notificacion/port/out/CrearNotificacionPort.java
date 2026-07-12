@@ -5,4 +5,6 @@ import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionC
 public interface CrearNotificacionPort {
 
     void notificar(CrearNotificacionCommand cmd);
+
+    void notificarTransaccional(CrearNotificacionCommand cmd);
 }

@@ -105,6 +105,10 @@ public interface ClientePerfilJpaRepository extends JpaRepository<ClientePerfilE
     void reactivar(@Param("id") Long id);
 
     @Modifying
+    @Query("UPDATE ClientePerfilEntity c SET c.aceptaComunicaciones = false WHERE c.id = :id")
+    void desactivarComunicaciones(@Param("id") Long id);
+
+    @Modifying
     @Query("UPDATE ClientePerfilEntity c SET c.totalGastado = c.totalGastado + :monto WHERE c.id = :id")
     void sumarTotalGastado(@Param("id") Long id, @Param("monto") BigDecimal monto);
 }

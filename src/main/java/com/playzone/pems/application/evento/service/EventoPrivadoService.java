@@ -1,5 +1,6 @@
 package com.playzone.pems.application.evento.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.auditoria.AuditoriaConstants;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.evento.dto.command.ConfirmarEventoCommand;
@@ -56,7 +57,6 @@ import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.util.FechaUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -72,7 +72,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EventoPrivadoService
@@ -107,6 +106,7 @@ public class EventoPrivadoService
     private final RegistrarLogUseCase              auditoria;
     private final CrearNotificacionPort            crearNotificacionPort;
     private final SedeScopeValidator               sedeScope;
+    private final ObjectMapper                     objectMapper;
 
     // ─── Consultas ────────────────────────────────────────────────────────────
 
@@ -226,15 +226,9 @@ public class EventoPrivadoService
         Turno         turno   = obtenerTurno(guardado.getIdTurno());
         EventoPrivadoQuery query = toQuery(guardado, cliente, turno, true);
 
-        if (cliente.getCorreo() != null) {
-            notificacionPort.notificarSolicitudRecibida(cliente.getCorreo(), query);
-        } else {
-            log.warn("Evento {} sin correo de cliente {}, no se envia notificacion solicitud",
-                    guardado.getId(), guardado.getIdCliente());
-        }
         notificacionPort.notificarAdminNuevaSolicitud(query);
 
-        crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                 .tipoCodigo("EVENTO_PRESUPUESTO_ENVIADO")
                 .destinatarioClienteId(guardado.getIdCliente())
                 .entidadTipo("evento_privado")
@@ -310,15 +304,15 @@ public class EventoPrivadoService
         Turno         turno   = obtenerTurno(guardado.getIdTurno());
         EventoPrivadoQuery query = toQuery(guardado, cliente, turno, true);
 
-        if (cliente.getCorreo() != null) {
-            notificacionPort.notificarEventoConfirmado(cliente.getCorreo(), query);
-        } else {
-            log.warn("Evento {} sin correo de cliente {}, no se envia notificacion confirmacion",
-                    guardado.getId(), guardado.getIdCliente());
-        }
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("EVENTO_CONFIRMADO")
+                .destinatarioClienteId(guardado.getIdCliente())
+                .entidadTipo("evento_privado")
+                .entidadId(guardado.getId())
+                .build());
 
         if (adelanto.compareTo(BigDecimal.ZERO) > 0) {
-            crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+            crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                     .tipoCodigo("PAGO_ADELANTO_CONFIRMADO")
                     .destinatarioClienteId(guardado.getIdCliente())
                     .entidadTipo("evento_privado")
@@ -328,14 +322,16 @@ public class EventoPrivadoService
                             "fecha", guardado.getFechaEvento().toString()))
                     .build());
             if (command.getIdUsuarioGestor() != null) {
-                crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+                crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                         .tipoCodigo("EVENTO_ADELANTO_RECIBIDO")
                         .destinatarioUsuarioId(command.getIdUsuarioGestor())
                         .entidadTipo("evento_privado")
                         .entidadId(guardado.getId())
                         .datosExtra(Map.of(
                                 "monto",   adelanto.toPlainString(),
-                                "cliente", cliente.nombreCompleto()))
+                                "cliente", cliente.nombreCompleto(),
+                                "evento",  query.getTipoEvento(),
+                                "fecha",   guardado.getFechaEvento().toString()))
                         .build());
             }
         }
@@ -390,10 +386,8 @@ public class EventoPrivadoService
         EventoPrivado guardado = eventoRepository.save(actualizado);
 
         ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
-        if (cliente.getCorreo() != null) {
-            BigDecimal saldoRestante = guardado.getPrecioContrato().subtract(guardado.getMontoAdelanto());
-            notificacionPort.notificarAbonoRecibido(cliente.getCorreo(), toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false), totalPago, saldoRestante);
-        }
+        enviarNotificacionAbono(guardado, cliente, totalPago);
+
         return toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), true);
     }
 
@@ -434,22 +428,47 @@ public class EventoPrivadoService
         BigDecimal nuevoAdelanto = evento.getMontoAdelanto().add(command.getMonto());
         EventoPrivado guardado = eventoRepository.save(evento.toBuilder().montoAdelanto(nuevoAdelanto).build());
 
-        if (evento.getIdUsuarioGestor() != null) {
-            crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+        ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
+        enviarNotificacionAbono(guardado, cliente, command.getMonto());
+
+        return toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false);
+    }
+
+    private void enviarNotificacionAbono(EventoPrivado guardado, ClientePerfil cliente, BigDecimal monto) {
+        BigDecimal saldo = guardado.calcularMontoSaldo() != null ? guardado.calcularMontoSaldo() : BigDecimal.ZERO;
+
+        if (guardado.getIdUsuarioGestor() != null) {
+            crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                     .tipoCodigo("EVENTO_SALDO_RECIBIDO")
-                    .destinatarioUsuarioId(evento.getIdUsuarioGestor())
+                    .destinatarioUsuarioId(guardado.getIdUsuarioGestor())
                     .entidadTipo("evento_privado")
                     .entidadId(guardado.getId())
-                    .datosExtra(Map.of("monto", command.getMonto().toPlainString()))
+                    .datosExtra(Map.of(
+                            "monto",   monto.toPlainString(),
+                            "cliente", cliente.nombreCompleto(),
+                            "evento",  guardado.getNombreTipoEvento() != null ? guardado.getNombreTipoEvento() : guardado.getTipoEvento(),
+                            "saldo",   saldo.toPlainString()))
                     .build());
         }
 
-        ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
-        if (cliente.getCorreo() != null) {
-            BigDecimal saldoRestante = guardado.getPrecioContrato().subtract(guardado.getMontoAdelanto());
-            notificacionPort.notificarAbonoRecibido(cliente.getCorreo(), toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false), command.getMonto(), saldoRestante);
+        String metadataJson;
+        try {
+            metadataJson = objectMapper.writeValueAsString(Map.of("montoAbonado", monto.toPlainString()));
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo serializar el monto del abono.", e);
         }
-        return toQuery(guardado, cliente, obtenerTurno(guardado.getIdTurno()), false);
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("EVENTO_ABONO_RECIBIDO")
+                .destinatarioClienteId(guardado.getIdCliente())
+                .entidadTipo("evento_privado")
+                .entidadId(guardado.getId())
+                .datosExtra(Map.of(
+                        "monto", monto.toPlainString(),
+                        "fecha", guardado.getFechaEvento().toString(),
+                        "saldo", saldo.toPlainString()))
+                .metadata(metadataJson)
+                .build());
     }
 
     // ─── Completar ────────────────────────────────────────────────────────────
@@ -503,11 +522,8 @@ public class EventoPrivadoService
         ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
         Turno         turno   = obtenerTurno(guardado.getIdTurno());
         EventoPrivadoQuery query = toQuery(guardado, cliente, turno, false);
-        if (cliente.getCorreo() != null) {
-            notificacionPort.notificarEventoCancelado(cliente.getCorreo(), query, motivoCancelacion);
-        }
 
-        crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                 .tipoCodigo("EVENTO_CANCELADO_ADMIN")
                 .destinatarioClienteId(guardado.getIdCliente())
                 .entidadTipo("evento_privado")

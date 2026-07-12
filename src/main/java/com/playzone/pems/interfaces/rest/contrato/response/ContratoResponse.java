@@ -14,52 +14,30 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ContratoResponse {
 
-    private Long        id;
-    private Long        idEventoPrivado;
-    private String      estado;
-    private boolean     esEditable;
-    private String      contenidoTexto;
-    private String      archivoPdfUrl;
-    private LocalDate   fechaFirma;
-    private String      usuarioRedactor;
-    private String      plantilla;
-    private String      observaciones;
-    private int         version;
-    private OffsetDateTime fechaCreacion;
-    private OffsetDateTime fechaActualizacion;
+    private Long            id;
+    private Long            idEventoPrivado;
+    private String          usuarioCarga;
+    private OffsetDateTime  fechaCarga;
 
-    private String      nombreCliente;
-    private String      correoCliente;
-    private String      tipoEvento;
-    private LocalDate   fechaEvento;
-    private String      turno;
-    private Integer     aforoDeclarado;
-    private BigDecimal  precioTotalContrato;
-    private BigDecimal  montoAdelanto;
-    private BigDecimal  saldoPendiente;
+    private String     nombreCliente;
+    private String     correoCliente;
+    private String     tipoEvento;
+    private LocalDate  fechaEvento;
+    private String     turno;
+    private Integer    aforoDeclarado;
+    private BigDecimal precioTotalContrato;
+    private BigDecimal montoAdelanto;
+    private BigDecimal saldoPendiente;
 
-    private List<DocumentoContratoResponse> documentos;
     private List<ActividadContratoResponse> actividades;
 
     @Getter
     @Builder
-    public static class DocumentoContratoResponse {
-        private Long          id;
-        private String        nombre;
-        private String        archivoUrl;
-        private String        tipoArchivo;
-        private Long          tamanobytes;
-        private String        usuarioCarga;
-        private OffsetDateTime fechaCarga;
-    }
-
-    @Getter
-    @Builder
     public static class ActividadContratoResponse {
-        private Long          id;
-        private String        accion;
-        private String        descripcion;
-        private String        usuario;
+        private Long           id;
+        private String         accion;
+        private String         descripcion;
+        private String         usuario;
         private OffsetDateTime fechaAccion;
     }
 }

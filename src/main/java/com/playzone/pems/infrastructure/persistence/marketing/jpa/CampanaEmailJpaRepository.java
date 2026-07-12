@@ -14,6 +14,8 @@ public interface CampanaEmailJpaRepository extends JpaRepository<CampanaEmailEnt
     @Query("SELECT c FROM CampanaEmailEntity c WHERE c.estado = 'PROGRAMADA' AND c.fechaProgramada <= :ahora")
     List<CampanaEmailEntity> findProgramadasParaEnviar(@Param("ahora") OffsetDateTime ahora);
 
+    List<CampanaEmailEntity> findByEstado(String estado);
+
     @Modifying
     @Query("UPDATE CampanaEmailEntity c SET c.estado = :estado WHERE c.id = :id")
     void actualizarEstado(@Param("id") Long id, @Param("estado") String estado);

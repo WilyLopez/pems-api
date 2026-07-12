@@ -43,4 +43,14 @@ public interface StaffPerfilJpaRepository extends JpaRepository<StaffPerfilEntit
     long contarActivosPorRolExcluyendo(
             @org.springframework.data.repository.query.Param("rolCodigo") String rolCodigo,
             @org.springframework.data.repository.query.Param("excludeId") Long excludeId);
+
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT DISTINCT sp.usuario_id
+            FROM staff_perfil sp
+            INNER JOIN usuario_rol ur ON sp.usuario_id = ur.usuario_id
+            WHERE ur.rol_codigo IN ('SUPERADMIN', 'ADMIN')
+              AND sp.es_activo = true
+              AND sp.deleted_at IS NULL
+            """, nativeQuery = true)
+    java.util.List<UUID> obtenerAdministradoresActivos();
 }

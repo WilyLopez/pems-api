@@ -12,6 +12,9 @@ import com.playzone.pems.application.finanzas.dto.query.MovimientoCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.ResumenCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.SesionCajaQuery;
 import com.playzone.pems.application.finanzas.port.in.GestionarCajaUseCase;
+import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
+import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
+import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
 import com.playzone.pems.domain.finanzas.model.ArqueoCaja;
 import com.playzone.pems.domain.finanzas.model.MovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.SesionCaja;
@@ -23,6 +26,10 @@ import com.playzone.pems.domain.finanzas.repository.MovimientoCajaRepository;
 import com.playzone.pems.domain.configuracion.model.ConfiguracionGlobal;
 import com.playzone.pems.domain.configuracion.repository.ConfiguracionGlobalRepository;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
+import com.playzone.pems.domain.usuario.model.PerfilUsuario;
+import com.playzone.pems.domain.usuario.model.Sede;
+import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
+import com.playzone.pems.domain.usuario.repository.SedeRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
@@ -36,6 +43,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,6 +54,8 @@ public class SesionCajaService implements GestionarCajaUseCase {
 
     private static final ZoneId LIMA = ZoneId.of("America/Lima");
     private static final String CLAVE_UMBRAL_DIFERENCIA = "CAJA_UMBRAL_DIFERENCIA";
+    private static final String CLAVE_MONTO_MOVIMIENTO_GRANDE = "CAJA_MONTO_MOVIMIENTO_GRANDE";
+    private static final BigDecimal MONTO_MOVIMIENTO_GRANDE_DEFECTO = new BigDecimal("500");
 
     private final SesionCajaRepository           sesionCajaRepository;
     private final MovimientoCajaRepository       movimientoCajaRepository;
@@ -53,6 +63,10 @@ public class SesionCajaService implements GestionarCajaUseCase {
     private final ConfiguracionGlobalRepository  configuracionGlobalRepository;
     private final SupabaseAuthFacade             authFacade;
     private final RegistrarLogUseCase            auditoria;
+    private final CrearNotificacionPort          crearNotificacionPort;
+    private final ResolverAdministradoresPort    resolverAdministradoresPort;
+    private final PerfilUsuarioRepository        perfilUsuarioRepository;
+    private final SedeRepository                 sedeRepository;
 
     @Override
     public SesionCajaQuery abrir(AbrirCajaCommand command) {
@@ -87,6 +101,13 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 null, "tipo=" + command.getTipo() + " | saldoInicial=" + saldoInicial,
                 "Caja abierta (" + command.getTipo() + ") en sede #" + command.getIdSede(),
                 null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        notificarAdmins("CAJA_APERTURA", Map.of(
+                "sede", nombreSede(command.getIdSede()),
+                "usuario", nombreUsuario(command.getIdUsuarioApertura()),
+                "tipo", command.getTipo().toString(),
+                "saldoInicial", saldoInicial.toPlainString()));
+
         return resultado;
     }
 
@@ -150,6 +171,13 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 null, null,
                 esPropia ? AuditoriaConstants.NIVEL_INFO : AuditoriaConstants.NIVEL_WARNING,
                 AuditoriaConstants.RESULTADO_EXITOSO));
+
+        if (diferencia.abs().compareTo(umbral) > 0) {
+            notificarAdmins("CAJA_CIERRE_DISCREPANCIA", Map.of(
+                    "sede", nombreSede(sesion.getIdSede()),
+                    "diferencia", diferencia.toPlainString()));
+        }
+
         return resultado;
     }
 
@@ -216,6 +244,9 @@ public class SesionCajaService implements GestionarCajaUseCase {
                     "La caja fue cerrada mientras se registraba el movimiento. Intenta nuevamente.");
         }
 
+        notificarSiMovimientoGrande(sesion.getIdSede(), command.getTipo().toString(),
+                command.getMonto(), command.getConcepto());
+
         return toMovimientoQuery(guardado);
     }
 
@@ -272,6 +303,9 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 "Movimiento #" + original.getId() + " anulado con contraasiento #" + contraasiento.getId()
                         + " | motivo=" + command.getMotivo().trim(),
                 null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        notificarSiMovimientoGrande(sesion.getIdSede(), original.getTipo().toString(),
+                original.getMonto(), contraasiento.getConcepto());
 
         return toMovimientoQuery(contraasiento);
     }
@@ -356,6 +390,46 @@ public class SesionCajaService implements GestionarCajaUseCase {
                     }
                 })
                 .orElse(BigDecimal.ZERO);
+    }
+
+    private BigDecimal montoMovimientoGrande() {
+        return configuracionGlobalRepository.findByClave(CLAVE_MONTO_MOVIMIENTO_GRANDE)
+                .map(ConfiguracionGlobal::getValor)
+                .map(valor -> {
+                    try {
+                        return new BigDecimal(valor.trim());
+                    } catch (NumberFormatException e) {
+                        return MONTO_MOVIMIENTO_GRANDE_DEFECTO;
+                    }
+                })
+                .orElse(MONTO_MOVIMIENTO_GRANDE_DEFECTO);
+    }
+
+    private void notificarSiMovimientoGrande(Long idSede, String tipo, BigDecimal monto, String concepto) {
+        if (monto.compareTo(montoMovimientoGrande()) < 0) return;
+        notificarAdmins("CAJA_MOVIMIENTO_GRANDE", Map.of(
+                "sede", nombreSede(idSede),
+                "tipo", tipo,
+                "monto", monto.toPlainString(),
+                "concepto", concepto != null ? concepto : ""));
+    }
+
+    private void notificarAdmins(String tipoCodigo, Map<String, String> datosExtra) {
+        for (UUID adminId : resolverAdministradoresPort.obtenerIdsAdministradoresActivos()) {
+            crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+                    .tipoCodigo(tipoCodigo)
+                    .destinatarioUsuarioId(adminId)
+                    .datosExtra(datosExtra)
+                    .build());
+        }
+    }
+
+    private String nombreSede(Long idSede) {
+        return sedeRepository.findById(idSede).map(Sede::getNombre).orElse("Sede #" + idSede);
+    }
+
+    private String nombreUsuario(UUID usuarioId) {
+        return perfilUsuarioRepository.buscarPorId(usuarioId).map(PerfilUsuario::getNombreCompleto).orElse("");
     }
 
     private SesionCaja obtenerSesionAccesible(Long idSesionCaja) {

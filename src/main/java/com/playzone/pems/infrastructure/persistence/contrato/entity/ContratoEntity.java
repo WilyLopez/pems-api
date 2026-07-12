@@ -1,11 +1,20 @@
 package com.playzone.pems.infrastructure.persistence.contrato.entity;
 
-import com.playzone.pems.domain.contrato.model.enums.EstadoContrato;
 import com.playzone.pems.infrastructure.persistence.evento.entity.EventoPrivadoEntity;
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Column;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -27,36 +36,12 @@ public class ContratoEntity {
     @JoinColumn(name = "evento_id", nullable = false)
     private EventoPrivadoEntity eventoPrivado;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private EstadoContrato estado;
-
-    @Column(name = "contenido_texto", columnDefinition = "TEXT")
-    private String contenidoTexto;
-
-    @Column(name = "archivo_pdf_path", length = 500)
+    @Column(name = "archivo_pdf_path", nullable = false, length = 500)
     private String archivoPdfUrl;
 
-    @Column(name = "firmado_at")
-    private OffsetDateTime fechaFirma;
+    @Column(name = "cargado_por", columnDefinition = "uuid", nullable = false)
+    private UUID cargadoPor;
 
-    @Column(name = "redactor_id", columnDefinition = "uuid")
-    private UUID redactorId;
-
-    @Column(length = 60)
-    private String plantilla;
-
-    @Column(columnDefinition = "TEXT")
-    private String observaciones;
-
-    @Column(name = "version_v")
-    private int version;
-
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
+    @Column(name = "cargado_at", nullable = false)
+    private OffsetDateTime cargadoAt;
 }

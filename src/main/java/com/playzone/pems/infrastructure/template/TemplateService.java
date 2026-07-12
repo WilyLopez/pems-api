@@ -1,5 +1,6 @@
 package com.playzone.pems.infrastructure.template;
 
+import com.playzone.pems.shared.util.HtmlEscapeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,7 @@ public class TemplateService {
 
             for (Map.Entry<String, String> entry : variables.entrySet()) {
                 String placeholder = "{{" + entry.getKey() + "}}";
-                content = content.replace(placeholder, entry.getValue() != null ? entry.getValue() : "");
+                content = content.replace(placeholder, HtmlEscapeUtil.escapar(entry.getValue()));
             }
 
             return content;

@@ -40,6 +40,12 @@ public class NotificacionPersistenceAdapter implements NotificacionRepository, T
     }
 
     @Override
+    public Optional<Notificacion> findUltimaPorEntidad(String entidadTipo, Long entidadId) {
+        return jpa.findFirstByEntidadTipoAndEntidadIdOrderByFechaCreacionDesc(entidadTipo, entidadId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Page<Notificacion> findFeedUsuario(UUID usuarioId, boolean soloNoLeidas, Pageable pageable) {
         return jpa.findFeedUsuario(usuarioId, soloNoLeidas, pageable).map(mapper::toDomain);
     }

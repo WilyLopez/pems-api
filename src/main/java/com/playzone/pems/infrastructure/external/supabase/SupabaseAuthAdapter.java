@@ -100,6 +100,32 @@ public class SupabaseAuthAdapter implements SupabaseAuthPort {
     }
 
     @Override
+    public void establecerPasswordAdmin(UUID usuarioId, String nuevoPassword) {
+        if (serviceRoleKey == null || serviceRoleKey.isBlank()) {
+            throw new IllegalStateException("La clave service_role de Supabase no está configurada. No se puede establecer la contraseña.");
+        }
+
+        String url = authUrl + "/admin/users/" + usuarioId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("apikey", serviceRoleKey);
+        headers.set("Authorization", "Bearer " + serviceRoleKey);
+
+        Map<String, String> body = new HashMap<>();
+        body.put("password", nuevoPassword);
+
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
+
+        try {
+            restTemplate.put(url, request);
+        } catch (HttpClientErrorException e) {
+            log.error("Error al establecer contraseña vía Admin API en Supabase: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Error al establecer contraseña: " + e.getResponseBodyAsString());
+        }
+    }
+
+    @Override
     public UUID crearUsuario(String email, String password, String nombreCompleto, boolean confirmarEmail) {
         String url;
         HttpHeaders headers = new HttpHeaders();

@@ -3,6 +3,7 @@ package com.playzone.pems.interfaces.rest.cms;
 import com.playzone.pems.application.cms.port.in.GestionarMensajeContactoUseCase;
 import com.playzone.pems.domain.cms.model.MensajeContacto;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
+import com.playzone.pems.shared.ratelimit.RateLimited;
 import com.playzone.pems.shared.response.ApiResponse;
 import com.playzone.pems.shared.response.PagedResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,6 +35,7 @@ public class MensajeContactoController {
     // ── Público ──────────────────────────────────────────────────────────
 
     @PostMapping
+    @RateLimited(requests = 3, durationInSeconds = 60)
     public ResponseEntity<ApiResponse<MensajeContactoResponse>> registrar(
             @Valid @RequestBody RegistrarMensajeRequest request,
             HttpServletRequest servletRequest) {

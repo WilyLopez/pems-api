@@ -6,11 +6,9 @@ import lombok.Getter;
 @Getter
 @Builder
 public class RegistrarUsuarioAdminCommand {
-    private String  nombre;
-    private String  correo;
-    private String  rolCodigo;
-    private Long    sedeId;
-    private String  password;
-    private boolean generarPassword;
-    private String  telefono;
+    private String nombre;
+    private String correo;
+    private String rolCodigo;
+    private Long   sedeId;
+    private String telefono;
 }

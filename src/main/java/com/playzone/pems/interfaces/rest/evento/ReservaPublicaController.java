@@ -9,14 +9,18 @@ import com.playzone.pems.application.cms.port.in.RegistrarConsentimientoUseCase;
 import com.playzone.pems.application.evento.port.in.*;
 import com.playzone.pems.application.evento.service.ReservaAdminService;
 import com.playzone.pems.application.evento.service.ReservaPublicaService;
+import com.playzone.pems.application.notificacion.dto.query.EstadoEntregaQuery;
+import com.playzone.pems.application.notificacion.port.in.ConsultarEstadoEntregaUseCase;
 import com.playzone.pems.interfaces.rest.evento.request.CrearReservaRequest;
 import com.playzone.pems.interfaces.rest.evento.request.ReprogramarReservaRequest;
+import com.playzone.pems.interfaces.rest.evento.response.EstadoEntregaCorreoResponse;
 import com.playzone.pems.interfaces.rest.evento.response.MetricasReservaResponse;
 import com.playzone.pems.interfaces.rest.evento.response.ReservaPublicaResponse;
 import com.playzone.pems.interfaces.rest.evento.response.TicketDetalleResponse;
 import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ValidationException;
+import com.playzone.pems.shared.ratelimit.RateLimited;
 import com.playzone.pems.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +61,7 @@ public class ReservaPublicaController {
     private final ConsultarReservasUseCase    consultarUseCase;
     private final BuscarReservasAdminUseCase  buscarAdminUseCase;
     private final ConfirmarIngresoUseCase     ingresoUseCase;
+    private final ConsultarEstadoEntregaUseCase estadoEntregaUseCase;
     private final ReservaPublicaService       reservaService;
     private final ReservaAdminService         reservaAdminService;
     private final SupabaseAuthFacade          supabaseAuthFacade;
@@ -169,6 +174,7 @@ public class ReservaPublicaController {
 
     @PostMapping("/clientes/{idCliente}/sedes/{idSede}")
     @PreAuthorize("hasAuthority('reserva.crear')")
+    @RateLimited(requests = 5, durationInSeconds = 60)
     public ResponseEntity<ApiResponse<ReservaPublicaResponse>> crear(
             @PathVariable Long idCliente,
             @PathVariable Long idSede,
@@ -204,6 +210,7 @@ public class ReservaPublicaController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('reserva.crear')")
+    @RateLimited(requests = 5, durationInSeconds = 60)
     public ResponseEntity<ApiResponse<ReservaPublicaResponse>> crearConParams(
             @RequestParam Long idCliente,
             @RequestParam Long idSede,
@@ -259,6 +266,21 @@ public class ReservaPublicaController {
             @PathVariable Long id,
             @RequestParam(required = false) String motivo) {
         return ResponseEntity.ok(ApiResponse.ok(toResponse(reservaService.rechazarPago(id, motivo))));
+    }
+
+    @GetMapping("/{idReserva}/estado-correo")
+    @PreAuthorize("hasAuthority('reserva.ver')")
+    public ResponseEntity<ApiResponse<EstadoEntregaCorreoResponse>> estadoCorreo(
+            @PathVariable Long idReserva) {
+        ReservaPublicaQuery reserva = reservaService.consultarPorId(idReserva);
+        validarAccesoReserva(reserva);
+
+        EstadoEntregaQuery estado = estadoEntregaUseCase.consultarPorEntidad("reserva_publica", idReserva);
+        return ResponseEntity.ok(ApiResponse.ok(EstadoEntregaCorreoResponse.builder()
+                .estado(estado.getEstado())
+                .fechaEnvio(estado.getFechaEnvio())
+                .mensajeError(estado.getMensajeError())
+                .build()));
     }
 
     @GetMapping("/{idReserva}/ticket")
@@ -341,6 +363,19 @@ public class ReservaPublicaController {
             return propio;
         }
         return solicitado;
+    }
+
+    private void validarAccesoReserva(ReservaPublicaQuery reserva) {
+        if (supabaseAuthFacade.tieneRol("CLIENTE")) {
+            Long propio = supabaseAuthFacade.clientePerfilId()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Cliente sin perfil asociado"));
+            if (!propio.equals(reserva.getIdCliente())) {
+                throw new AccessDeniedException("No puedes consultar datos de otro cliente");
+            }
+            return;
+        }
+        sedeScope.validarAcceso(reserva.getIdSede());
     }
 
     private TicketDetalleResponse toDetalleResponse(TicketDetalleQuery q) {

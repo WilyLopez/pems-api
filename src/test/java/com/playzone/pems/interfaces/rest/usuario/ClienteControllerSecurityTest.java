@@ -53,6 +53,7 @@ class ClienteControllerSecurityTest {
     @MockBean private RegistrarVisitaPerfilUseCase   visitaUseCase;
     @MockBean private ActualizarSegmentoPerfilUseCase segmentoUseCase;
     @MockBean private CompletarPerfilClienteUseCase  completarUseCase;
+    @MockBean private ConfirmarCambioCorreoUseCase   confirmarCambioCorreoUseCase;
     @MockBean private SupabaseAuthFacade             supabaseAuthFacade;
     @MockBean private StoragePort                    storagePort;
     @MockBean private SupabaseJwtFilter              supabaseJwtFilter;

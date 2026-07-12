@@ -35,6 +35,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import com.playzone.pems.shared.ratelimit.RateLimited;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -131,6 +132,7 @@ public class EventoPrivadoController {
 
     @PostMapping("/clientes/{idCliente}/sedes/{idSede}")
     @PreAuthorize("hasAuthority('evento.crear') or @supabaseAuthFacade.tieneRol('CLIENTE')")
+    @RateLimited(requests = 5, durationInSeconds = 60)
     public ResponseEntity<ApiResponse<EventoPrivadoResponse>> solicitar(
             @PathVariable Long idCliente,
             @PathVariable Long idSede,

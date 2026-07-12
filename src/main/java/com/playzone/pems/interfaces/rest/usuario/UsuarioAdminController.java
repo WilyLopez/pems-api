@@ -69,10 +69,8 @@ public class UsuarioAdminController {
                 RegistrarUsuarioAdminCommand.builder()
                         .nombre(request.getNombre())
                         .correo(request.getCorreo())
-                        .password(request.getPassword())
                         .rolCodigo(request.getRol())
                         .sedeId(sedeId)
-                        .generarPassword(request.isGenerarPassword())
                         .telefono(request.getTelefono())
                         .build()
         );

@@ -10,14 +10,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.time.ZoneOffset;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
 public class ContratoEntityMapper {
 
-    private final ClientePerfilRepository  clientePerfilRepository;
-    private final PerfilUsuarioRepository  perfilUsuarioRepository;
+    private final ClientePerfilRepository clientePerfilRepository;
+    private final PerfilUsuarioRepository perfilUsuarioRepository;
 
     public Contrato toDomain(ContratoEntity e) {
         if (e == null) return null;
@@ -26,28 +26,24 @@ public class ContratoEntityMapper {
         BigDecimal saldo = BigDecimal.ZERO;
         if (ev.getPrecioContrato() != null) {
             saldo = ev.getPrecioContrato().subtract(
-                ev.getMontoAdelanto() != null ? ev.getMontoAdelanto() : BigDecimal.ZERO);
+                    ev.getMontoAdelanto() != null ? ev.getMontoAdelanto() : BigDecimal.ZERO);
         }
+
+        Optional<ClientePerfil> cliente = clientePerfilRepository.buscarPorId(ev.getClienteId());
 
         return Contrato.builder()
                 .id(e.getId())
                 .idEventoPrivado(ev.getId())
-                .estado(e.getEstado())
-                .contenidoTexto(e.getContenidoTexto())
+                .idCliente(ev.getClienteId())
                 .archivoPdfUrl(e.getArchivoPdfUrl())
-                .fechaFirma(e.getFechaFirma() != null ? e.getFechaFirma().toLocalDate() : null)
-                .idUsuarioRedactor(e.getRedactorId())
-                .usuarioRedactor(e.getRedactorId() != null
-                        ? perfilUsuarioRepository.buscarPorId(e.getRedactorId())
+                .idUsuarioCarga(e.getCargadoPor())
+                .usuarioCarga(e.getCargadoPor() != null
+                        ? perfilUsuarioRepository.buscarPorId(e.getCargadoPor())
                                 .map(u -> u.getNombreCompleto()).orElse(null)
                         : null)
-                .plantilla(e.getPlantilla())
-                .observaciones(e.getObservaciones())
-                .version(e.getVersion())
-                .nombreCliente(clientePerfilRepository.buscarPorId(ev.getClienteId())
-                        .map(ClientePerfil::nombreCompleto).orElse(null))
-                .correoCliente(clientePerfilRepository.buscarPorId(ev.getClienteId())
-                        .map(ClientePerfil::getCorreo).orElse(null))
+                .fechaCarga(e.getCargadoAt())
+                .nombreCliente(cliente.map(ClientePerfil::nombreCompleto).orElse(null))
+                .correoCliente(cliente.map(ClientePerfil::getCorreo).orElse(null))
                 .tipoEvento(ev.getTipoEvento())
                 .fechaEvento(ev.getFechaEvento())
                 .turno(ev.getTurno().getNombre())
@@ -55,8 +51,6 @@ public class ContratoEntityMapper {
                 .precioTotalContrato(ev.getPrecioContrato())
                 .montoAdelanto(ev.getMontoAdelanto())
                 .saldoPendiente(saldo)
-                .fechaCreacion(e.getCreatedAt())
-                .fechaActualizacion(e.getUpdatedAt())
                 .build();
     }
 
@@ -65,14 +59,9 @@ public class ContratoEntityMapper {
         return ContratoEntity.builder()
                 .id(d.getId())
                 .eventoPrivado(evento)
-                .estado(d.getEstado())
-                .contenidoTexto(d.getContenidoTexto())
                 .archivoPdfUrl(d.getArchivoPdfUrl())
-                .fechaFirma(d.getFechaFirma() != null ? d.getFechaFirma().atStartOfDay().atOffset(ZoneOffset.UTC) : null)
-                .redactorId(d.getIdUsuarioRedactor())
-                .plantilla(d.getPlantilla())
-                .observaciones(d.getObservaciones())
-                .version(d.getVersion())
+                .cargadoPor(d.getIdUsuarioCarga())
+                .cargadoAt(d.getFechaCarga())
                 .build();
     }
 }

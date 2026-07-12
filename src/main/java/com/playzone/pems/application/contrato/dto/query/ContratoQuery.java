@@ -12,31 +12,22 @@ import java.util.List;
 @Builder(toBuilder = true)
 public class ContratoQuery {
 
-    private Long        id;
-    private Long        idEventoPrivado;
-    private String      estado;
-    private String      contenidoTexto;
-    private String      archivoPdfUrl;
-    private LocalDate   fechaFirma;
-    private String      usuarioRedactor;
-    private String      plantilla;
-    private String      observaciones;
-    private int         version;
-    private OffsetDateTime fechaCreacion;
-    private OffsetDateTime fechaActualizacion;
+    private Long           id;
+    private Long           idEventoPrivado;
+    private Long           idCliente;
+    private String         archivoPdfUrl;
+    private String         usuarioCarga;
+    private OffsetDateTime fechaCarga;
 
-    private String      nombreCliente;
-    private String      correoCliente;
-    private String      tipoEvento;
-    private LocalDate   fechaEvento;
-    private String      turno;
-    private Integer     aforoDeclarado;
-    private BigDecimal  precioTotalContrato;
-    private BigDecimal  montoAdelanto;
-    private BigDecimal  saldoPendiente;
+    private String     nombreCliente;
+    private String     correoCliente;
+    private String     tipoEvento;
+    private LocalDate  fechaEvento;
+    private String     turno;
+    private Integer    aforoDeclarado;
+    private BigDecimal precioTotalContrato;
+    private BigDecimal montoAdelanto;
+    private BigDecimal saldoPendiente;
 
-    private boolean esEditable;
-
-    private List<DocumentoContratoQuery> documentos;
     private List<ActividadContratoQuery> actividades;
 }

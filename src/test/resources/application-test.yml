@@ -41,5 +41,4 @@ playzone:
   correo:
     remitente: test@playzone.com
     nombre-remitente: PlayZone Test
-    alertas-admin: test-admin@playzone.com
 

@@ -40,6 +40,11 @@ public class CampanaPersistenceAdapter implements CampanaEmailRepository {
     }
 
     @Override
+    public List<CampanaEmail> findByEstado(String estado) {
+        return jpa.findByEstado(estado).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     @Transactional
     public CampanaEmail save(CampanaEmail campana) {
         CampanaEmailEntity entity = CampanaEmailEntity.builder()
