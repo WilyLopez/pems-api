@@ -146,9 +146,13 @@ playzone:
   correo:
     remitente: ${MAIL_FROM:${MAIL_USERNAME:tucorreo@gmail.com}}
     nombre-remitente: ${MAIL_SENDER_NAME:PlayZone}
-    alertas-admin: ${MAIL_ADMIN:}
+    alerta:
+      tasa-fallo-umbral: ${CORREO_ALERTA_TASA_FALLO:0.2}
+      minimo-muestra: ${CORREO_ALERTA_MINIMO_MUESTRA:5}
 
   url-base: ${APP_URL:http://localhost:8080}
+
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
 
   cors:
     origenes-permitidos: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
