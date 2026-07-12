@@ -2,6 +2,8 @@ package com.playzone.pems.interfaces.rest.marketing.request;
 
 import lombok.Getter;
 
+import java.util.Map;
+
 @Getter
 public class EnviarCampanaRequest {
 
@@ -12,4 +14,5 @@ public class EnviarCampanaRequest {
     private Boolean soloCorporativos;
     private Boolean soloConAccesoWeb;
     private Boolean soloPresenciales;
+    private Map<String, String> valoresVariables;
 }
