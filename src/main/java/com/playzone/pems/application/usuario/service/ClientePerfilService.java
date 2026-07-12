@@ -1,5 +1,9 @@
 package com.playzone.pems.application.usuario.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
+import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.application.usuario.dto.command.ActualizarClientePerfilCommand;
 import com.playzone.pems.application.usuario.dto.command.CompletarPerfilClienteCommand;
 import com.playzone.pems.application.usuario.dto.command.RegistrarClientePerfilCommand;
@@ -9,6 +13,7 @@ import com.playzone.pems.application.usuario.port.in.ActualizarClientePerfilUseC
 import com.playzone.pems.application.usuario.port.in.ActualizarSegmentoPerfilUseCase;
 import com.playzone.pems.application.usuario.port.in.CompletarPerfilClienteUseCase;
 import com.playzone.pems.application.usuario.port.in.ActivarClientePerfilUseCase;
+import com.playzone.pems.application.usuario.port.in.ConfirmarCambioCorreoUseCase;
 import com.playzone.pems.application.usuario.port.in.DesactivarClientePerfilUseCase;
 import com.playzone.pems.application.usuario.port.in.HacerVipPerfilUseCase;
 import com.playzone.pems.application.usuario.port.in.ListarClientesPerfilUseCase;
@@ -19,11 +24,14 @@ import com.playzone.pems.application.usuario.port.in.RegistrarClientePublicoUseC
 import com.playzone.pems.application.usuario.port.in.RegistrarVisitaPerfilUseCase;
 import com.playzone.pems.application.usuario.port.out.SupabaseAuthPort;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
+import com.playzone.pems.domain.usuario.model.ClienteToken;
 import com.playzone.pems.domain.usuario.model.PerfilUsuario;
 import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
+import com.playzone.pems.domain.usuario.repository.ClienteTokenRepository;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
+import com.playzone.pems.shared.util.TokenHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,11 +58,18 @@ public class ClientePerfilService
         QuitarVipPerfilUseCase,
         RegistrarVisitaPerfilUseCase,
         ActualizarSegmentoPerfilUseCase,
-        CompletarPerfilClienteUseCase {
+        CompletarPerfilClienteUseCase,
+        ConfirmarCambioCorreoUseCase {
+
+    private static final int    TOKEN_CORREO_VIGENCIA_HORAS = 24;
+    private static final String TIPO_TOKEN_VERIFICAR_CORREO = "VERIFICAR_CORREO";
 
     private final ClientePerfilRepository clientePerfilRepository;
     private final PerfilUsuarioRepository perfilUsuarioRepository;
     private final SupabaseAuthPort        supabaseAuthPort;
+    private final ClienteTokenRepository  clienteTokenRepository;
+    private final CrearNotificacionPort   crearNotificacionPort;
+    private final ObjectMapper            objectMapper;
 
     @Override
     @Transactional
@@ -266,12 +282,25 @@ public class ClientePerfilService
         ClientePerfil existente = clientePerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ClientePerfil", id));
 
+        boolean correoProvisto = command.getCorreo() != null && !command.getCorreo().isBlank();
+        boolean teniaCorreo    = existente.getCorreo() != null;
+        boolean cambiaCorreo   = correoProvisto && teniaCorreo
+                && !command.getCorreo().equalsIgnoreCase(existente.getCorreo());
+        boolean primerCorreo   = correoProvisto && !teniaCorreo;
+
+        if (cambiaCorreo) {
+            clientePerfilRepository.buscarPorCorreo(command.getCorreo())
+                    .filter(c -> !c.getId().equals(id))
+                    .ifPresent(c -> { throw new ValidationException("correo", "Ese correo ya está en uso."); });
+            solicitarCambioCorreo(existente, command.getCorreo());
+        }
+
         ClientePerfil actualizado = existente.toBuilder()
                 .nombres(command.getNombres() != null ? command.getNombres() : existente.getNombres())
                 .apellidoPaterno(command.getApellidoPaterno() != null ? command.getApellidoPaterno() : existente.getApellidoPaterno())
                 .apellidoMaterno(command.getApellidoMaterno() != null ? command.getApellidoMaterno() : existente.getApellidoMaterno())
                 .telefono(command.getTelefono() != null ? command.getTelefono() : existente.getTelefono())
-                .correo(command.getCorreo() != null ? command.getCorreo() : existente.getCorreo())
+                .correo(primerCorreo ? command.getCorreo() : existente.getCorreo())
                 .aceptaComunicaciones(command.getAceptaComunicaciones() != null
                         ? command.getAceptaComunicaciones()
                         : existente.isAceptaComunicaciones())
@@ -281,6 +310,90 @@ public class ClientePerfilService
                 .build();
 
         return clientePerfilRepository.guardar(actualizado);
+    }
+
+    private void solicitarCambioCorreo(ClientePerfil cliente, String correoNuevo) {
+        String tokenCrudo = TokenHasher.generarTokenAleatorio();
+
+        String tokenMetadata = serializar(Map.of("correoNuevo", correoNuevo));
+        clienteTokenRepository.guardar(ClienteToken.builder()
+                .clienteId(cliente.getId())
+                .tokenHash(TokenHasher.hashear(tokenCrudo))
+                .tipo(TIPO_TOKEN_VERIFICAR_CORREO)
+                .metadata(tokenMetadata)
+                .expiraAt(OffsetDateTime.now().plusHours(TOKEN_CORREO_VIGENCIA_HORAS))
+                .build());
+
+        String notifMetadata = serializar(Map.of("correoNuevo", correoNuevo, "tokenCorreo", tokenCrudo));
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("CAMBIO_CORREO_SOLICITADO")
+                .destinatarioClienteId(cliente.getId())
+                .datosExtra(Map.of("correoNuevo", correoNuevo))
+                .metadata(notifMetadata)
+                .build());
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("CAMBIO_CORREO_ALERTA")
+                .destinatarioClienteId(cliente.getId())
+                .datosExtra(Map.of("correoNuevo", correoNuevo))
+                .build());
+    }
+
+    @Override
+    @Transactional
+    public void confirmar(Long idCliente, String token) {
+        String tokenHash = TokenHasher.hashear(token);
+        ClienteToken clienteToken = clienteTokenRepository.buscarPorTokenHash(tokenHash)
+                .filter(t -> TIPO_TOKEN_VERIFICAR_CORREO.equals(t.getTipo()))
+                .orElseThrow(() -> new ValidationException("token", "El enlace de confirmación no es válido."));
+
+        if (!clienteToken.getClienteId().equals(idCliente)) {
+            throw new ValidationException("token", "El enlace de confirmación no es válido.");
+        }
+        if (!clienteToken.estaVigente()) {
+            throw new ValidationException("token", "El enlace de confirmación expiró o ya fue utilizado.");
+        }
+
+        String correoNuevo = extraerCorreoNuevo(clienteToken.getMetadata());
+
+        clientePerfilRepository.buscarPorCorreo(correoNuevo)
+                .filter(c -> !c.getId().equals(idCliente))
+                .ifPresent(c -> { throw new ValidationException("correo", "Ese correo ya está en uso."); });
+
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(idCliente)
+                .orElseThrow(() -> new ResourceNotFoundException("ClientePerfil", idCliente));
+
+        clientePerfilRepository.guardar(cliente.toBuilder().correo(correoNuevo).build());
+        clienteTokenRepository.guardar(clienteToken.toBuilder().usadoAt(OffsetDateTime.now()).build());
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("CAMBIO_CORREO_CONFIRMADO")
+                .destinatarioClienteId(idCliente)
+                .datosExtra(Map.of("correoNuevo", correoNuevo))
+                .build());
+    }
+
+    private String extraerCorreoNuevo(String metadataJson) {
+        try {
+            JsonNode nodo = objectMapper.readTree(metadataJson);
+            String correo = nodo.path("correoNuevo").asText(null);
+            if (correo == null || correo.isBlank()) {
+                throw new IllegalStateException("El token no contiene el correo nuevo.");
+            }
+            return correo;
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo leer el correo nuevo del token.", e);
+        }
+    }
+
+    private String serializar(Map<String, String> datos) {
+        try {
+            return objectMapper.writeValueAsString(datos);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo serializar la información del token.", e);
+        }
     }
 
     @Override

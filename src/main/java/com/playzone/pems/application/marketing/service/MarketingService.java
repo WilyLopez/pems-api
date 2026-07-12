@@ -6,13 +6,16 @@ import com.playzone.pems.application.marketing.dto.command.CrearCorreoMarketingC
 import com.playzone.pems.application.marketing.dto.command.CrearTipoEmailCommand;
 import com.playzone.pems.application.marketing.dto.command.FiltroDestinatariosCommand;
 import com.playzone.pems.application.marketing.dto.command.GuardarPlantillaCommand;
+import com.playzone.pems.application.marketing.util.EmailBlockRenderer;
 import com.playzone.pems.application.marketing.util.VariableCatalog;
+import com.playzone.pems.application.cms.port.in.GestionarConfiguracionPublicaUseCase;
 import com.playzone.pems.application.marketing.dto.query.CampanaEmailQuery;
 import com.playzone.pems.application.marketing.dto.query.EnvioEmailQuery;
 import com.playzone.pems.application.marketing.dto.query.PlantillaEmailQuery;
 import com.playzone.pems.application.marketing.dto.query.TipoEmailQuery;
 import com.playzone.pems.application.marketing.port.in.CrearCampanaEmailUseCase;
 import com.playzone.pems.application.marketing.port.in.CrearPlantillaEmailUseCase;
+import com.playzone.pems.application.marketing.port.in.DesuscribirClienteUseCase;
 import com.playzone.pems.application.marketing.port.in.EnviarCampanaUseCase;
 import com.playzone.pems.application.marketing.port.in.ListarCampanasUseCase;
 import com.playzone.pems.application.marketing.port.in.ListarEnviosUseCase;
@@ -31,16 +34,25 @@ import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.response.PagedResponse;
+import com.playzone.pems.shared.util.TokenEncryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -53,13 +65,23 @@ public class MarketingService
         CrearCampanaEmailUseCase,
         ListarCampanasUseCase,
         EnviarCampanaUseCase,
-        ListarEnviosUseCase {
+        ListarEnviosUseCase,
+        DesuscribirClienteUseCase {
+
+    private static final int MAX_DESTINATARIOS_POR_ENVIO = 5000;
+    private static final int TAMANO_LOTE_INSERCION = 200;
 
     private final PlantillaEmailRepository plantillaRepo;
     private final CampanaEmailRepository   campanaRepo;
     private final EnvioEmailRepository     envioRepo;
     private final TipoEmailRepository      tipoEmailRepo;
     private final ClientePerfilRepository   clientePerfilRepository;
+    private final EmailBlockRenderer        blockRenderer;
+    private final TokenEncryptor            tokenEncryptor;
+    private final GestionarConfiguracionPublicaUseCase configuracionPublica;
+
+    @Value("${playzone.url-base}")
+    private String urlBase;
 
     @Override
     @Transactional
@@ -149,34 +171,82 @@ public class MarketingService
         PlantillaEmail plantilla = plantillaRepo.findById(campana.getIdPlantillaEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("PlantillaEmail", campana.getIdPlantillaEmail()));
 
-        CampanaDestinatariosQuery filtroQuery = CampanaDestinatariosQuery.builder()
-                .soloVip(filtro.getSoloVip())
-                .soloFrecuentes(filtro.getSoloFrecuentes())
-                .soloNuevos(filtro.getSoloNuevos())
-                .soloInactivos(filtro.getSoloInactivos())
-                .soloCorporativos(filtro.getSoloCorporativos())
-                .soloPresenciales(filtro.getSoloPresenciales())
-                .build();
+        if (plantilla.getContenidoBloques() == null || plantilla.getContenidoBloques().isBlank()) {
+            throw new ValidationException(
+                    "plantilla", "La plantilla no tiene contenido configurado y no puede enviarse como campaña.");
+        }
 
-        List<ClientePerfil> destinatarios = clientePerfilRepository.buscarDestinatariosCampana(filtroQuery);
+        Map<String, String> valoresVariables = filtro.getValoresVariables() != null
+                ? filtro.getValoresVariables() : Map.of();
 
-        List<EnvioEmail> envios = destinatarios.stream()
-                .filter(c -> c.getCorreo() != null)
-                .map(c -> EnvioEmail.builder()
-                        .idCampanaEmail(idCampana)
-                        .idCliente(c.getId())
-                        .destinatario(c.getCorreo())
-                        .asunto(plantilla.getAsunto())
-                        .estado("PENDIENTE")
-                        .intentos(0)
-                        .fechaCreacion(Instant.now())
-                        .build())
-                .toList();
+        Set<String> requeridas = VariableCatalog.variablesRequeridas(plantilla.getContenidoBloques());
+        Set<String> faltantes = requeridas.stream()
+                .filter(v -> valoresVariables.get(v) == null || valoresVariables.get(v).isBlank())
+                .collect(Collectors.toSet());
+        if (!faltantes.isEmpty()) {
+            throw new ValidationException("valoresVariables",
+                    "Faltan valores para las variables: " + String.join(", ", faltantes));
+        }
 
-        envioRepo.guardarTodos(envios);
+        List<ClientePerfil> destinatarios = buscarDestinatariosConCorreo(filtro);
+
+        if (destinatarios.size() > MAX_DESTINATARIOS_POR_ENVIO) {
+            throw new ValidationException("destinatarios",
+                    "La campaña tiene " + destinatarios.size() + " destinatarios, por encima del límite de "
+                            + MAX_DESTINATARIOS_POR_ENVIO + ". Acota los filtros antes de enviar.");
+        }
+
+        Map<String, String> valoresGlobales = valoresVariablesGlobales(valoresVariables);
+
+        List<EnvioEmail> envios = new ArrayList<>(destinatarios.size());
+        for (ClientePerfil c : destinatarios) {
+            Map<String, String> valoresCliente = new HashMap<>(valoresGlobales);
+            valoresCliente.put("nombreCliente", c.nombreCompleto());
+            valoresCliente.put("ultimaVisita", c.getUltimaVisitaAt() != null
+                    ? c.getUltimaVisitaAt().toLocalDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "");
+
+            String urlBaja = urlBase + "/api/v1/marketing/unsubscribe?token="
+                    + java.net.URLEncoder.encode(tokenEncryptor.encrypt(c.getId().toString()),
+                            java.nio.charset.StandardCharsets.UTF_8);
+
+            String cuerpoHtml = blockRenderer.renderizar(plantilla.getContenidoBloques(), valoresCliente, urlBaja);
+
+            envios.add(EnvioEmail.builder()
+                    .idCampanaEmail(idCampana)
+                    .idCliente(c.getId())
+                    .destinatario(c.getCorreo())
+                    .asunto(plantilla.getAsunto())
+                    .cuerpoHtml(cuerpoHtml)
+                    .estado("PENDIENTE")
+                    .intentos(0)
+                    .fechaCreacion(Instant.now())
+                    .build());
+        }
+
+        for (int i = 0; i < envios.size(); i += TAMANO_LOTE_INSERCION) {
+            envioRepo.guardarTodos(envios.subList(i, Math.min(i + TAMANO_LOTE_INSERCION, envios.size())));
+        }
+
         campanaRepo.actualizarEstado(idCampana, "ENVIANDO");
 
         log.info("Campaña {} preparada con {} destinatarios", idCampana, envios.size());
+    }
+
+    private Map<String, String> valoresVariablesGlobales(Map<String, String> valoresAdmin) {
+        Map<String, String> valores = new HashMap<>(valoresAdmin);
+        String nombreNegocio = configuracionPublica.obtener().getNombreNegocio();
+        valores.put("nombreNegocio", nombreNegocio != null && !nombreNegocio.isBlank() ? nombreNegocio : "Kiki y Lala");
+        LocalDate hoy = LocalDate.now();
+        valores.put("mes", hoy.getMonth().getDisplayName(TextStyle.FULL, new Locale("es", "PE")));
+        valores.put("anio", String.valueOf(hoy.getYear()));
+        return valores;
+    }
+
+    @Override
+    @Transactional
+    public void ejecutar(Long idCliente) {
+        clientePerfilRepository.desactivarComunicaciones(idCliente);
+        log.info("Cliente {} se dio de baja de comunicaciones de marketing", idCliente);
     }
 
     @Override
@@ -342,6 +412,37 @@ public class MarketingService
         return campanaRepo.findById(id)
                 .map(this::toCampanaQuery)
                 .orElseThrow(() -> new ResourceNotFoundException("CampanaEmail", id));
+    }
+
+    @Transactional(readOnly = true)
+    public Set<String> obtenerVariablesRequeridas(Long idCampana) {
+        CampanaEmail campana = campanaRepo.findById(idCampana)
+                .orElseThrow(() -> new ResourceNotFoundException("CampanaEmail", idCampana));
+        PlantillaEmail plantilla = plantillaRepo.findById(campana.getIdPlantillaEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("PlantillaEmail", campana.getIdPlantillaEmail()));
+        return VariableCatalog.variablesRequeridas(plantilla.getContenidoBloques());
+    }
+
+    @Transactional(readOnly = true)
+    public int contarDestinatarios(Long idCampana, FiltroDestinatariosCommand filtro) {
+        campanaRepo.findById(idCampana)
+                .orElseThrow(() -> new ResourceNotFoundException("CampanaEmail", idCampana));
+        return buscarDestinatariosConCorreo(filtro).size();
+    }
+
+    private List<ClientePerfil> buscarDestinatariosConCorreo(FiltroDestinatariosCommand filtro) {
+        CampanaDestinatariosQuery filtroQuery = CampanaDestinatariosQuery.builder()
+                .soloVip(filtro.getSoloVip())
+                .soloFrecuentes(filtro.getSoloFrecuentes())
+                .soloNuevos(filtro.getSoloNuevos())
+                .soloInactivos(filtro.getSoloInactivos())
+                .soloCorporativos(filtro.getSoloCorporativos())
+                .soloPresenciales(filtro.getSoloPresenciales())
+                .build();
+
+        return clientePerfilRepository.buscarDestinatariosCampana(filtroQuery).stream()
+                .filter(c -> c.getCorreo() != null)
+                .toList();
     }
 
     private PlantillaEmailQuery toPlantillaQuery(PlantillaEmail p) {

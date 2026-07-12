@@ -1,5 +1,6 @@
 package com.playzone.pems.application.marketing.util;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,6 +20,14 @@ public final class VariableCatalog {
             "anio",
             "nombreNino",
             "ultimaVisita"
+    );
+
+    public static final Set<String> AUTO_RESUELTAS = Set.of(
+            "nombreCliente",
+            "nombreNegocio",
+            "ultimaVisita",
+            "mes",
+            "anio"
     );
 
     public static final Set<String> SISTEMA_BLOQUEADAS = Set.of(
@@ -59,5 +68,12 @@ public final class VariableCatalog {
                 );
             }
         }
+    }
+
+    public static Set<String> variablesRequeridas(String contenido) {
+        Set<String> requeridas = new HashSet<>(extraerVariables(contenido));
+        requeridas.retainAll(MARKETING_PERMITIDAS);
+        requeridas.removeAll(AUTO_RESUELTAS);
+        return requeridas;
     }
 }

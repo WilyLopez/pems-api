@@ -2,38 +2,39 @@ package com.playzone.pems.application.cms.service;
 
 import com.playzone.pems.application.auditoria.AuditoriaConstants;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
-import com.playzone.pems.application.cms.port.in.GestionarConfiguracionPublicaUseCase;
 import com.playzone.pems.application.cms.port.in.GestionarMensajeContactoUseCase;
+import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
 import com.playzone.pems.domain.cms.model.MensajeContacto;
 import com.playzone.pems.domain.cms.repository.MensajeContactoRepository;
+import com.playzone.pems.domain.usuario.model.PerfilUsuario;
+import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.infrastructure.external.correo.JavaMailCorreoClient;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
+import com.playzone.pems.shared.util.HtmlEscapeUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class MensajeContactoService implements GestionarMensajeContactoUseCase {
 
-    @Value("${playzone.correo.alertas-admin:}")
-    private String adminEmailOverride;
-
-
-    private final MensajeContactoRepository            repository;
-    private final JavaMailCorreoClient                 correoClient;
-    private final GestionarConfiguracionPublicaUseCase configuracionPublica;
-    private final SupabaseAuthFacade                   authFacade;
-    private final RegistrarLogUseCase                  auditoria;
+    private final MensajeContactoRepository   repository;
+    private final JavaMailCorreoClient        correoClient;
+    private final ResolverAdministradoresPort resolverAdministradoresPort;
+    private final PerfilUsuarioRepository     perfilUsuarioRepository;
+    private final SupabaseAuthFacade          authFacade;
+    private final RegistrarLogUseCase         auditoria;
 
     @Override
     @Transactional
@@ -62,12 +63,9 @@ public class MensajeContactoService implements GestionarMensajeContactoUseCase {
         MensajeContacto guardado = repository.save(mensaje);
 
         try {
-            String correoAdmin = adminEmailOverride;
-            if (correoAdmin == null || correoAdmin.isBlank()) {
-                correoAdmin = configuracionPublica.obtener().getCorreo();
-            }
-            if (correoAdmin == null || correoAdmin.isBlank()) {
-                log.warn("correo admin no configurado, omitiendo alerta de contacto");
+            List<String> correosAdmin = resolverCorreosAdministradores();
+            if (correosAdmin.isEmpty()) {
+                log.warn("no hay administradores activos, omitiendo alerta de contacto");
             } else {
                 String asuntoEmail = "[Contacto Web] Nuevo mensaje de " + cmd.getNombre();
                 String cuerpoHtml = String.format(
@@ -82,10 +80,14 @@ public class MensajeContactoService implements GestionarMensajeContactoUseCase {
                         "</div>" +
                         "<p style='font-size:11px;color:#94a3b8;margin-top:20px;'>IP Origen: %s</p>" +
                         "</div>",
-                        cmd.getNombre(), cmd.getCorreo(), cmd.getTelefono() != null ? cmd.getTelefono() : "—",
-                        cmd.getAsunto() != null ? cmd.getAsunto() : "—", cmd.getMensaje(), cmd.getIpOrigen()
+                        HtmlEscapeUtil.escapar(cmd.getNombre()), HtmlEscapeUtil.escapar(cmd.getCorreo()),
+                        cmd.getTelefono() != null ? HtmlEscapeUtil.escapar(cmd.getTelefono()) : "—",
+                        cmd.getAsunto() != null ? HtmlEscapeUtil.escapar(cmd.getAsunto()) : "—",
+                        HtmlEscapeUtil.escapar(cmd.getMensaje()), HtmlEscapeUtil.escapar(cmd.getIpOrigen())
                 );
-                correoClient.enviar(correoAdmin, asuntoEmail, cuerpoHtml);
+                for (String correoAdmin : correosAdmin) {
+                    correoClient.enviar(correoAdmin, asuntoEmail, cuerpoHtml);
+                }
             }
         } catch (Exception e) {
             log.error("No se pudo enviar correo de alerta de contacto a admin: {}", e.getMessage());
@@ -137,7 +139,8 @@ public class MensajeContactoService implements GestionarMensajeContactoUseCase {
                     "<hr style='border:0;border-top:1px solid #e2e8f0;margin-top:24px;'>" +
                     "<p style='font-size:11px;color:#94a3b8;'>Por favor, no respondas a este correo. Fue generado automáticamente.</p>" +
                     "</div>",
-                    mensaje.getNombre(), mensaje.getMensaje(), cmd.getRespuesta()
+                    HtmlEscapeUtil.escapar(mensaje.getNombre()), HtmlEscapeUtil.escapar(mensaje.getMensaje()),
+                    HtmlEscapeUtil.escapar(cmd.getRespuesta())
             );
             correoClient.enviar(mensaje.getCorreo(), asuntoEmail, cuerpoHtml);
         } catch (Exception e) {
@@ -194,5 +197,14 @@ public class MensajeContactoService implements GestionarMensajeContactoUseCase {
     private MensajeContacto findOrThrow(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("MensajeContacto", id));
+    }
+
+    private List<String> resolverCorreosAdministradores() {
+        return resolverAdministradoresPort.obtenerIdsAdministradoresActivos().stream()
+                .map(perfilUsuarioRepository::buscarPorId)
+                .flatMap(Optional::stream)
+                .map(PerfilUsuario::getCorreo)
+                .filter(correo -> correo != null && !correo.isBlank())
+                .toList();
     }
 }

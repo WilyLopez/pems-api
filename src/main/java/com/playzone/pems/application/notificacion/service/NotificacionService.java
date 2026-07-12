@@ -1,7 +1,9 @@
 package com.playzone.pems.application.notificacion.service;
 
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
+import com.playzone.pems.application.notificacion.dto.query.EstadoEntregaQuery;
 import com.playzone.pems.application.notificacion.dto.query.NotificacionQuery;
+import com.playzone.pems.application.notificacion.port.in.ConsultarEstadoEntregaUseCase;
 import com.playzone.pems.application.notificacion.port.in.CrearNotificacionUseCase;
 import com.playzone.pems.application.notificacion.port.in.MarcarNotificacionLeidaUseCase;
 import com.playzone.pems.application.notificacion.port.in.ObtenerNotificacionesUseCase;
@@ -12,6 +14,8 @@ import com.playzone.pems.domain.notificacion.model.TipoNotificacion;
 import com.playzone.pems.domain.notificacion.repository.NotificacionEntregaRepository;
 import com.playzone.pems.domain.notificacion.repository.NotificacionRepository;
 import com.playzone.pems.domain.notificacion.repository.TipoNotificacionRepository;
+import com.playzone.pems.domain.preferencia.model.PreferenciaUsuario;
+import com.playzone.pems.domain.preferencia.repository.PreferenciaUsuarioRepository;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,11 +39,13 @@ public class NotificacionService
         implements CrearNotificacionUseCase,
                    CrearNotificacionPort,
                    ObtenerNotificacionesUseCase,
-                   MarcarNotificacionLeidaUseCase {
+                   MarcarNotificacionLeidaUseCase,
+                   ConsultarEstadoEntregaUseCase {
 
     private final TipoNotificacionRepository tipoRepo;
     private final NotificacionRepository     notifRepo;
     private final NotificacionEntregaRepository entregaRepo;
+    private final PreferenciaUsuarioRepository preferenciaUsuarioRepo;
 
     @Override
     @Async("asyncExecutor")
@@ -51,6 +57,12 @@ public class NotificacionService
             log.error("Error al crear notificacion tipo={} destinatarioUsuario={} destinatarioCliente={}",
                     cmd.getTipoCodigo(), cmd.getDestinatarioUsuarioId(), cmd.getDestinatarioClienteId(), e);
         }
+    }
+
+    @Override
+    @Transactional
+    public void notificarTransaccional(CrearNotificacionCommand cmd) {
+        persistir(cmd);
     }
 
     @Override
@@ -103,6 +115,43 @@ public class NotificacionService
         notifRepo.marcarTodasLeidasCliente(clienteId);
     }
 
+    @Override
+    public EstadoEntregaQuery consultarPorEntidad(String entidadTipo, Long entidadId) {
+        return notifRepo.findUltimaPorEntidad(entidadTipo, entidadId)
+                .map(this::estadoEntregaDeNotificacion)
+                .orElseGet(() -> EstadoEntregaQuery.builder()
+                        .entidadTipo(entidadTipo)
+                        .entidadId(entidadId)
+                        .estado("SIN_ENVIO")
+                        .build());
+    }
+
+    private EstadoEntregaQuery estadoEntregaDeNotificacion(Notificacion notif) {
+        return entregaRepo.findByNotificacionId(notif.getId()).stream()
+                .filter(e -> "EMAIL".equals(e.getCanal()))
+                .findFirst()
+                .map(e -> EstadoEntregaQuery.builder()
+                        .entidadTipo(notif.getEntidadTipo())
+                        .entidadId(notif.getEntidadId())
+                        .estado(mapEstadoEntrega(e.getEstado()))
+                        .fechaEnvio(e.getEnviadoAt())
+                        .mensajeError(e.getMensajeError())
+                        .build())
+                .orElseGet(() -> EstadoEntregaQuery.builder()
+                        .entidadTipo(notif.getEntidadTipo())
+                        .entidadId(notif.getEntidadId())
+                        .estado("SIN_ENVIO")
+                        .build());
+    }
+
+    private String mapEstadoEntrega(String estado) {
+        return switch (estado) {
+            case "ENVIADO" -> "ENVIADO";
+            case "ERROR", "REBOTADO" -> "ERROR";
+            default -> "PENDIENTE";
+        };
+    }
+
     private NotificacionQuery persistir(CrearNotificacionCommand cmd) {
         TipoNotificacion tipo = tipoRepo.findByCodigo(cmd.getTipoCodigo())
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -128,20 +177,24 @@ public class NotificacionService
 
         Notificacion guardada = notifRepo.save(notif);
 
-        registrarEntregas(guardada.getId(), tipo.getCanalesDefault());
+        registrarEntregas(guardada, tipo);
 
         return toQuery(guardada);
     }
 
-    private void registrarEntregas(Long notificacionId, List<String> canales) {
+    private void registrarEntregas(Notificacion notif, TipoNotificacion tipo) {
+        List<String> canales = tipo.getCanalesDefault();
         if (canales == null || canales.isEmpty()) return;
+
+        boolean permiteEmail = tipo.isEsObligatoria() || respetaPreferenciaEmail(notif.getDestinatarioUsuarioId());
 
         List<NotificacionEntrega> entregas = new ArrayList<>();
 
         for (String canal : canales) {
+            if ("EMAIL".equals(canal) && !permiteEmail) continue;
             String estado = canal.equals("IN_APP") ? "ENVIADO" : "PENDIENTE";
             entregas.add(NotificacionEntrega.builder()
-                    .notificacionId(notificacionId)
+                    .notificacionId(notif.getId())
                     .canal(canal)
                     .estado(estado)
                     .intentos(0)
@@ -149,7 +202,16 @@ public class NotificacionService
                     .build());
         }
 
-        entregaRepo.saveAll(entregas);
+        if (!entregas.isEmpty()) {
+            entregaRepo.saveAll(entregas);
+        }
+    }
+
+    private boolean respetaPreferenciaEmail(UUID destinatarioUsuarioId) {
+        if (destinatarioUsuarioId == null) return true;
+        return preferenciaUsuarioRepo.buscarPorUsuarioId(destinatarioUsuarioId)
+                .map(PreferenciaUsuario::isNotificacionesEmail)
+                .orElse(true);
     }
 
     private String interpolar(String plantilla, Map<String, String> datos) {

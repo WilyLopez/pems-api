@@ -2,11 +2,15 @@ package com.playzone.pems.application.usuario.service;
 
 import com.playzone.pems.application.auditoria.AuditoriaConstants;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
+import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
+import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
+import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
 import com.playzone.pems.application.usuario.port.in.CambiarPasswordMeUseCase;
 import com.playzone.pems.application.usuario.port.in.LoginUseCase;
 import com.playzone.pems.application.usuario.port.in.RecuperarPasswordUseCase;
 import com.playzone.pems.application.usuario.port.out.SupabaseAuthPort;
 import com.playzone.pems.domain.configuracion.repository.ConfiguracionGlobalRepository;
+import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.domain.usuario.model.StaffPerfil;
 import com.playzone.pems.domain.usuario.repository.StaffPerfilRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthContext;
@@ -31,9 +35,12 @@ public class AuthService implements LoginUseCase, RecuperarPasswordUseCase, Camb
 
     private final SupabaseAuthPort               supabaseAuthPort;
     private final StaffPerfilRepository          staffPerfilRepository;
+    private final ClientePerfilRepository        clientePerfilRepository;
     private final SupabaseAuthFacade             supabaseAuthFacade;
     private final ConfiguracionGlobalRepository  configuracionGlobalRepository;
     private final RegistrarLogUseCase            auditoria;
+    private final CrearNotificacionPort          crearNotificacionPort;
+    private final ResolverAdministradoresPort    resolverAdministradoresPort;
 
     private int leerEntero(String clave, int defecto) {
         return configuracionGlobalRepository.findByClave(clave)
@@ -105,6 +112,9 @@ public class AuthService implements LoginUseCase, RecuperarPasswordUseCase, Camb
                             "PerfilUsuario", null, null, null,
                             "Cuenta bloqueada tras " + nuevosIntentos + " intentos fallidos",
                             ipOrigen, userAgent, AuditoriaConstants.NIVEL_CRITICAL, AuditoriaConstants.RESULTADO_FALLIDO));
+
+                    notificarBloqueo(userId, emailNorm, "Demasiados intentos fallidos de inicio de sesión ("
+                            + nuevosIntentos + ").");
                 }
             }
             throw new UnauthorizedException("Credenciales invalidas.");
@@ -131,12 +141,42 @@ public class AuthService implements LoginUseCase, RecuperarPasswordUseCase, Camb
 
         supabaseAuthPort.actualizarPassword(accessToken, nuevoPassword);
 
-        staffPerfilRepository.buscarPorUsuarioId(ctx.userId()).ifPresent(staff -> {
+        Optional<StaffPerfil> staffOpt = staffPerfilRepository.buscarPorUsuarioId(ctx.userId());
+        if (staffOpt.isPresent()) {
+            StaffPerfil staff = staffOpt.get();
             if (staff.isDebeCambiarContrasena()) {
                 staffPerfilRepository.guardar(staff.toBuilder()
                         .debeCambiarContrasena(false)
                         .build());
             }
-        });
+            crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                    .tipoCodigo("CAMBIO_PASSWORD")
+                    .destinatarioUsuarioId(ctx.userId())
+                    .build());
+        } else {
+            clientePerfilRepository.buscarPorUsuarioId(ctx.userId()).ifPresent(cliente ->
+                    crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                            .tipoCodigo("CAMBIO_PASSWORD")
+                            .destinatarioClienteId(cliente.getId())
+                            .build()));
+        }
+    }
+
+    private void notificarBloqueo(UUID usuarioId, String nombre, String motivo) {
+        Map<String, String> datos = Map.of("nombre", nombre, "motivo", motivo);
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("USUARIO_BLOQUEADO")
+                .destinatarioUsuarioId(usuarioId)
+                .datosExtra(datos)
+                .build());
+
+        for (UUID adminId : resolverAdministradoresPort.obtenerIdsAdministradoresActivos()) {
+            crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                    .tipoCodigo("USUARIO_BLOQUEADO")
+                    .destinatarioUsuarioId(adminId)
+                    .datosExtra(datos)
+                    .build());
+        }
     }
 }

@@ -1,9 +1,14 @@
 package com.playzone.pems.application.usuario.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.auditoria.AuditoriaConstants;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
+import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
+import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
+import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
 import com.playzone.pems.application.usuario.dto.command.RegistrarUsuarioAdminCommand;
 import com.playzone.pems.application.usuario.dto.response.UsuarioAdminResponse;
+import com.playzone.pems.application.usuario.port.in.ActivarCuentaStaffUseCase;
 import com.playzone.pems.application.usuario.port.in.ActivarUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.ActualizarUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.CambiarRolUsuarioAdminUseCase;
@@ -13,31 +18,32 @@ import com.playzone.pems.application.usuario.port.in.ListarUsuariosAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.ObtenerUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.RegistrarUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.ResetPasswordAdminUseCase;
-import com.playzone.pems.application.usuario.port.out.EnviarCorreoBienvenidaPort;
 import com.playzone.pems.application.usuario.port.out.SupabaseAuthPort;
 import com.playzone.pems.domain.usuario.model.PerfilUsuario;
 import com.playzone.pems.domain.usuario.model.Sede;
 import com.playzone.pems.domain.usuario.model.StaffPerfil;
+import com.playzone.pems.domain.usuario.model.StaffToken;
 import com.playzone.pems.domain.usuario.model.UsuarioRol;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
 import com.playzone.pems.domain.usuario.repository.StaffPerfilRepository;
+import com.playzone.pems.domain.usuario.repository.StaffTokenRepository;
 import com.playzone.pems.domain.usuario.repository.UsuarioRolRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
+import com.playzone.pems.shared.util.TokenHasher;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StaffService implements
@@ -49,7 +55,8 @@ public class StaffService implements
         ResetPasswordAdminUseCase,
         ActivarUsuarioAdminUseCase,
         DesactivarUsuarioAdminUseCase,
-        DesbloquearUsuarioAdminUseCase {
+        DesbloquearUsuarioAdminUseCase,
+        ActivarCuentaStaffUseCase {
 
     private static final int MAX_ADMINS   = 4;
     private static final int MAX_CAJEROS  = 5;
@@ -64,14 +71,20 @@ public class StaffService implements
     private static final String PW_ALL     = PW_UPPER + PW_LOWER + PW_DIGITS + PW_SPECIAL;
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private static final String TIPO_TOKEN_ACTIVACION = "ACTIVACION_CUENTA";
+    private static final int    TOKEN_ACTIVACION_VIGENCIA_HORAS = 24;
+
     private final StaffPerfilRepository    staffPerfilRepository;
     private final PerfilUsuarioRepository  perfilUsuarioRepository;
     private final SedeRepository           sedeRepository;
     private final UsuarioRolRepository     usuarioRolRepository;
+    private final StaffTokenRepository     staffTokenRepository;
     private final SupabaseAuthPort         supabaseAuthPort;
-    private final EnviarCorreoBienvenidaPort enviarCorreoBienvenidaPort;
+    private final CrearNotificacionPort    crearNotificacionPort;
+    private final ResolverAdministradoresPort resolverAdministradoresPort;
     private final SupabaseAuthFacade       authFacade;
     private final RegistrarLogUseCase      auditoria;
+    private final ObjectMapper             objectMapper;
 
 
     @Override
@@ -85,7 +98,7 @@ public class StaffService implements
             if (perfil == null) continue;
             Sede sede = sedeRepository.findById(staff.getSedeId()).orElse(null);
             List<String> roles = usuarioRolRepository.listarCodigosRolPorUsuario(staff.getUsuarioId());
-            response.add(buildResponse(staff, perfil, sede, roles, null));
+            response.add(buildResponse(staff, perfil, sede, roles));
         }
         return response;
     }
@@ -99,7 +112,7 @@ public class StaffService implements
                 .orElseThrow(() -> new ResourceNotFoundException("PerfilUsuario", "usuarioId", staff.getUsuarioId()));
         Sede sede = sedeRepository.findById(staff.getSedeId()).orElse(null);
         List<String> roles = usuarioRolRepository.listarCodigosRolPorUsuario(staff.getUsuarioId());
-        return buildResponse(staff, perfil, sede, roles, null);
+        return buildResponse(staff, perfil, sede, roles);
     }
 
 
@@ -134,17 +147,9 @@ public class StaffService implements
         Sede sede = sedeRepository.findById(command.getSedeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Sede", command.getSedeId()));
 
-        String passwordFinal;
-        if (command.isGenerarPassword()) {
-            passwordFinal = generarPasswordTemporal();
-        } else {
-            validarFortalezaPassword(command.getPassword());
-            passwordFinal = command.getPassword();
-        }
-
         UUID usuarioId;
         try {
-            usuarioId = supabaseAuthPort.crearUsuario(correoNorm, passwordFinal, command.getNombre(), true);
+            usuarioId = supabaseAuthPort.crearUsuario(correoNorm, generarPasswordTemporal(), command.getNombre(), true);
         } catch (Exception ex) {
             throw new ValidationException("correo", "El correo ya se encuentra registrado en el sistema.");
         }
@@ -165,32 +170,20 @@ public class StaffService implements
                 .intentosFallidos(0)
                 .build());
 
-        final String nombre     = command.getNombre();
-        final String password   = passwordFinal;
-        final String rolLabel   = ADMIN.equals(rol) ? "Administrador" : "Cajero";
-        final String sedeNombre = sede.getNombre();
-        CompletableFuture.runAsync(() -> {
-            try {
-                enviarCorreoBienvenidaPort.enviarCredencialesUsuario(correoNorm, nombre, password, rolLabel, sedeNombre);
-            } catch (Exception ex) {
-                log.error("No se pudo enviar el correo de bienvenida a " + correoNorm, ex);
-            }
-        });
+        enviarNotificacionActivacion(usuarioId, staff.getId());
 
         UUID actor = authFacade.usuarioActualId().orElse(null);
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 actor, AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_USUARIOS,
                 "Staff", staff.getId(),
                 null, correoNorm + " | rol=" + rol,
-                "Usuario creado: " + nombre + " (" + correoNorm + ")",
+                "Usuario creado: " + command.getNombre() + " (" + correoNorm + ")",
                 null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
-
-        String passwordTemporal = command.isGenerarPassword() ? passwordFinal : null;
 
         return UsuarioAdminResponse.builder()
                 .id(staff.getId())
                 .usuarioId(usuarioId)
-                .nombre(nombre)
+                .nombre(command.getNombre())
                 .correo(correoNorm)
                 .rol(rol)
                 .idSede(command.getSedeId())
@@ -198,8 +191,55 @@ public class StaffService implements
                 .activo(true)
                 .debeCambiarContrasena(true)
                 .intentosFallidos(0)
-                .passwordTemporal(passwordTemporal)
                 .build();
+    }
+
+    private void enviarNotificacionActivacion(UUID usuarioId, Long staffId) {
+        String tokenCrudo = TokenHasher.generarTokenAleatorio();
+
+        staffTokenRepository.guardar(StaffToken.builder()
+                .usuarioId(usuarioId)
+                .tokenHash(TokenHasher.hashear(tokenCrudo))
+                .tipo(TIPO_TOKEN_ACTIVACION)
+                .expiraAt(OffsetDateTime.now().plusHours(TOKEN_ACTIVACION_VIGENCIA_HORAS))
+                .build());
+
+        String metadataJson;
+        try {
+            metadataJson = objectMapper.writeValueAsString(Map.of("tokenActivacion", tokenCrudo));
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo serializar el token de activación.", e);
+        }
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("USUARIO_ACTIVACION")
+                .destinatarioUsuarioId(usuarioId)
+                .entidadTipo("Staff")
+                .entidadId(staffId)
+                .metadata(metadataJson)
+                .build());
+    }
+
+    @Override
+    @Transactional
+    public void activarCuenta(String token, String nuevaContrasena) {
+        String tokenHash = TokenHasher.hashear(token);
+        StaffToken staffToken = staffTokenRepository.buscarPorTokenHash(tokenHash)
+                .orElseThrow(() -> new ValidationException("token", "El enlace de activación no es válido."));
+
+        if (!staffToken.estaVigente()) {
+            throw new ValidationException("token", "El enlace de activación expiró o ya fue utilizado.");
+        }
+
+        validarFortalezaPassword(nuevaContrasena);
+
+        StaffPerfil staff = staffPerfilRepository.buscarPorUsuarioId(staffToken.getUsuarioId())
+                .orElseThrow(() -> new ResourceNotFoundException("StaffPerfil", "usuarioId", staffToken.getUsuarioId()));
+
+        supabaseAuthPort.establecerPasswordAdmin(staffToken.getUsuarioId(), nuevaContrasena);
+
+        staffTokenRepository.guardar(staffToken.toBuilder().usadoAt(OffsetDateTime.now()).build());
+        staffPerfilRepository.guardar(staff.toBuilder().debeCambiarContrasena(false).build());
     }
 
 
@@ -223,7 +263,7 @@ public class StaffService implements
                 .orElseThrow(() -> new ResourceNotFoundException("PerfilUsuario", "usuarioId", staff.getUsuarioId()));
         Sede sede = sedeRepository.findById(staff.getSedeId()).orElse(null);
         List<String> roles = usuarioRolRepository.listarCodigosRolPorUsuario(staff.getUsuarioId());
-        return buildResponse(staff, perfil, sede, roles, null);
+        return buildResponse(staff, perfil, sede, roles);
     }
 
 
@@ -282,7 +322,13 @@ public class StaffService implements
         PerfilUsuario perfil = perfilUsuarioRepository.buscarPorId(staff.getUsuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("PerfilUsuario", "usuarioId", staff.getUsuarioId()));
         Sede sede = sedeRepository.findById(staff.getSedeId()).orElse(null);
-        return buildResponse(staff, perfil, sede, List.of(rolNorm), null);
+
+        notificarSeguridadStaff("CAMBIO_ROL", staff.getUsuarioId(), Map.of(
+                "nombre", perfil.getNombreCompleto() != null ? perfil.getNombreCompleto() : "",
+                "rolAnterior", rolActual.isEmpty() ? "—" : rolActual,
+                "rolNuevo", rolNorm));
+
+        return buildResponse(staff, perfil, sede, List.of(rolNorm));
     }
 
 
@@ -343,6 +389,10 @@ public class StaffService implements
                 "activo", "inactivo",
                 "Usuario staff #" + id + " desactivado",
                 null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        notificarSeguridadStaff("USUARIO_BLOQUEADO", staff.getUsuarioId(), Map.of(
+                "nombre", nombreStaff(staff.getUsuarioId()),
+                "motivo", "Cuenta desactivada por un administrador."));
     }
 
 
@@ -363,6 +413,32 @@ public class StaffService implements
                 "bloqueado", "desbloqueado",
                 "Cuenta desbloqueada manualmente para staff #" + id,
                 null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        notificarSeguridadStaff("USUARIO_DESBLOQUEADO", staff.getUsuarioId(), Map.of(
+                "nombre", nombreStaff(staff.getUsuarioId())));
+    }
+
+    private String nombreStaff(UUID usuarioId) {
+        return perfilUsuarioRepository.buscarPorId(usuarioId)
+                .map(PerfilUsuario::getNombreCompleto)
+                .orElse("");
+    }
+
+    private void notificarSeguridadStaff(String tipoCodigo, UUID usuarioAfectado, Map<String, String> datosExtra) {
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo(tipoCodigo)
+                .destinatarioUsuarioId(usuarioAfectado)
+                .datosExtra(datosExtra)
+                .build());
+
+        for (UUID adminId : resolverAdministradoresPort.obtenerIdsAdministradoresActivos()) {
+            if (adminId.equals(usuarioAfectado)) continue;
+            crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                    .tipoCodigo(tipoCodigo)
+                    .destinatarioUsuarioId(adminId)
+                    .datosExtra(datosExtra)
+                    .build());
+        }
     }
 
     private void validarLimiteRol(String rol, Long excludeStaffId) {
@@ -416,8 +492,7 @@ public class StaffService implements
     }
 
     private UsuarioAdminResponse buildResponse(StaffPerfil staff, PerfilUsuario perfil,
-                                               Sede sede, List<String> roles,
-                                               String passwordTemporal) {
+                                               Sede sede, List<String> roles) {
         return UsuarioAdminResponse.builder()
                 .id(staff.getId())
                 .usuarioId(staff.getUsuarioId())
@@ -434,7 +509,6 @@ public class StaffService implements
                 .ultimoAcceso(perfil.getUltimoLoginAt())
                 .fechaCreacion(staff.getCreatedAt())
                 .fotoPerfilUrl(perfil.getFotoPerfilPath())
-                .passwordTemporal(passwordTemporal)
                 .build();
     }
 }

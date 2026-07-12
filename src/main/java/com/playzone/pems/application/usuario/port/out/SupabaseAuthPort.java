@@ -29,4 +29,9 @@ public interface SupabaseAuthPort {
      * Inicia el flujo de recuperación de contraseña.
      */
     void recuperarPassword(String email);
+
+    /**
+     * Establece la contraseña de un usuario existente mediante la Admin API (requiere service_role).
+     */
+    void establecerPasswordAdmin(UUID usuarioId, String nuevoPassword);
 }
