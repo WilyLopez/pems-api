@@ -6,6 +6,7 @@ import com.playzone.pems.infrastructure.persistence.notificacion.jpa.Notificacio
 import com.playzone.pems.infrastructure.persistence.notificacion.jpa.NotificacionJpaRepository;
 import com.playzone.pems.infrastructure.persistence.notificacion.mapper.NotificacionEntregaEntityMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,5 +34,20 @@ public class NotificacionEntregaPersistenceAdapter implements NotificacionEntreg
                 .map(e -> mapper.toEntity(e, notificacionJpa.getReferenceById(e.getNotificacionId())))
                 .toList();
         return jpa.saveAll(entities).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<NotificacionEntrega> findPendientesEmail(int limite) {
+        return jpa.findPendientesEmail(PageRequest.of(0, limite)).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<NotificacionEntrega> findParaReintentarEmail(int maxIntentos, int limite) {
+        return jpa.findParaReintentarEmail(maxIntentos, PageRequest.of(0, limite)).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<NotificacionEntrega> findByNotificacionId(Long notificacionId) {
+        return jpa.findByNotificacion_Id(notificacionId).stream().map(mapper::toDomain).toList();
     }
 }

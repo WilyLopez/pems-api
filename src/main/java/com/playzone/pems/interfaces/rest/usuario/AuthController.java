@@ -1,7 +1,9 @@
 package com.playzone.pems.interfaces.rest.usuario;
 
+import com.playzone.pems.application.usuario.port.in.ActivarCuentaStaffUseCase;
 import com.playzone.pems.application.usuario.port.in.LoginUseCase;
 import com.playzone.pems.application.usuario.port.in.RecuperarPasswordUseCase;
+import com.playzone.pems.interfaces.rest.usuario.request.ActivarCuentaStaffRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.LoginRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.RecuperarPasswordRequest;
 import com.playzone.pems.shared.response.ApiResponse;
@@ -24,6 +26,7 @@ public class AuthController {
 
     private final LoginUseCase             loginUseCase;
     private final RecuperarPasswordUseCase recuperarPasswordUseCase;
+    private final ActivarCuentaStaffUseCase activarCuentaStaffUseCase;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Map<String, Object>>> login(
@@ -39,6 +42,12 @@ public class AuthController {
     @PostMapping("/recuperar-password")
     public ResponseEntity<ApiResponse<Void>> recuperar(@Valid @RequestBody RecuperarPasswordRequest request) {
         recuperarPasswordUseCase.ejecutar(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    @PostMapping("/activar-cuenta")
+    public ResponseEntity<ApiResponse<Void>> activarCuenta(@Valid @RequestBody ActivarCuentaStaffRequest request) {
+        activarCuentaStaffUseCase.activarCuenta(request.getToken(), request.getNuevaContrasena());
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

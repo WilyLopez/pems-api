@@ -119,6 +119,12 @@ public class ClientePerfilPersistenceAdapter implements ClientePerfilRepository 
 
     @Override
     @Transactional
+    public void desactivarComunicaciones(Long id) {
+        jpa.desactivarComunicaciones(id);
+    }
+
+    @Override
+    @Transactional
     public void sumarTotalGastado(Long id, BigDecimal monto) {
         jpa.sumarTotalGastado(id, monto);
     }

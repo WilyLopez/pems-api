@@ -39,6 +39,9 @@ public class EnvioEmailEntity {
     @Column(nullable = false, length = 200)
     private String asunto;
 
+    @Column(name = "cuerpo_html", columnDefinition = "text")
+    private String cuerpoHtml;
+
     @Column(nullable = false, length = 30)
     @Builder.Default
     private String estado = "PENDIENTE";

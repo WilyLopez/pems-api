@@ -12,6 +12,7 @@ import com.playzone.pems.application.marketing.dto.query.PlantillaEmailQuery;
 import com.playzone.pems.application.marketing.dto.query.TipoEmailQuery;
 import com.playzone.pems.application.marketing.port.in.CrearCampanaEmailUseCase;
 import com.playzone.pems.application.marketing.port.in.CrearPlantillaEmailUseCase;
+import com.playzone.pems.application.marketing.port.in.DesuscribirClienteUseCase;
 import com.playzone.pems.application.marketing.port.in.EnviarCampanaUseCase;
 import com.playzone.pems.application.marketing.port.in.ListarCampanasUseCase;
 import com.playzone.pems.application.marketing.port.in.ListarEnviosUseCase;
@@ -24,18 +25,23 @@ import com.playzone.pems.interfaces.rest.marketing.request.CrearCorreoMarketingR
 import com.playzone.pems.interfaces.rest.marketing.request.CrearTipoEmailRequest;
 import com.playzone.pems.interfaces.rest.marketing.request.EnviarCampanaRequest;
 import com.playzone.pems.interfaces.rest.marketing.request.GuardarPlantillaRequest;
+import com.playzone.pems.shared.exception.ValidationException;
+import com.playzone.pems.shared.ratelimit.RateLimited;
 import com.playzone.pems.shared.response.ApiResponse;
 import com.playzone.pems.shared.response.PagedResponse;
+import com.playzone.pems.shared.util.TokenEncryptor;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -49,8 +55,10 @@ public class MarketingController {
     private final ListarCampanasUseCase      listarCampanasUseCase;
     private final EnviarCampanaUseCase       enviarCampanaUseCase;
     private final ListarEnviosUseCase        listarEnviosUseCase;
+    private final DesuscribirClienteUseCase  desuscribirClienteUseCase;
     private final MarketingService           marketingService;
     private final SupabaseAuthFacade         supabaseAuthFacade;
+    private final TokenEncryptor             tokenEncryptor;
 
     @GetMapping("/tipos-email")
     @PreAuthorize("hasAuthority('marketing.plantilla')")
@@ -160,11 +168,65 @@ public class MarketingController {
                         .soloCorporativos(request.getSoloCorporativos())
                         .soloConAccesoWeb(request.getSoloConAccesoWeb())
                         .soloPresenciales(request.getSoloPresenciales())
+                        .valoresVariables(request.getValoresVariables())
                         .build()
                 : FiltroDestinatariosCommand.builder().build();
 
         enviarCampanaUseCase.ejecutar(id, filtro);
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @GetMapping("/campanas/{id}/variables-requeridas")
+    @PreAuthorize("hasAuthority('marketing.campana')")
+    public ResponseEntity<ApiResponse<Set<String>>> variablesRequeridas(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(marketingService.obtenerVariablesRequeridas(id)));
+    }
+
+    @GetMapping("/campanas/{id}/destinatarios/count")
+    @PreAuthorize("hasAuthority('marketing.campana')")
+    public ResponseEntity<ApiResponse<Integer>> contarDestinatarios(
+            @PathVariable Long id,
+            @RequestParam(required = false) Boolean soloVip,
+            @RequestParam(required = false) Boolean soloFrecuentes,
+            @RequestParam(required = false) Boolean soloNuevos,
+            @RequestParam(required = false) Boolean soloInactivos,
+            @RequestParam(required = false) Boolean soloCorporativos,
+            @RequestParam(required = false) Boolean soloConAccesoWeb,
+            @RequestParam(required = false) Boolean soloPresenciales) {
+
+        FiltroDestinatariosCommand filtro = FiltroDestinatariosCommand.builder()
+                .soloVip(soloVip)
+                .soloFrecuentes(soloFrecuentes)
+                .soloNuevos(soloNuevos)
+                .soloInactivos(soloInactivos)
+                .soloCorporativos(soloCorporativos)
+                .soloConAccesoWeb(soloConAccesoWeb)
+                .soloPresenciales(soloPresenciales)
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.ok(marketingService.contarDestinatarios(id, filtro)));
+    }
+
+    @GetMapping("/unsubscribe")
+    @RateLimited(requests = 10, durationInSeconds = 60)
+    public ResponseEntity<String> unsubscribe(@RequestParam String token) {
+        Long idCliente;
+        try {
+            idCliente = Long.valueOf(tokenEncryptor.decrypt(token));
+        } catch (Exception e) {
+            throw new ValidationException("token", "El enlace de baja no es válido.");
+        }
+
+        desuscribirClienteUseCase.ejecutar(idCliente);
+
+        String html = "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\">"
+                + "<title>Baja de comunicaciones</title></head>"
+                + "<body style=\"font-family:Arial,sans-serif;text-align:center;padding:60px 20px;color:#1A1A2E;\">"
+                + "<h2>Listo, te diste de baja</h2>"
+                + "<p>Ya no recibirás más correos de marketing de Kiki y Lala.</p>"
+                + "</body></html>";
+
+        return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
 
     @GetMapping("/correos")

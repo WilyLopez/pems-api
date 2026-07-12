@@ -10,6 +10,7 @@ import com.playzone.pems.application.usuario.port.in.ActualizarClientePerfilUseC
 import com.playzone.pems.application.usuario.port.in.ActualizarSegmentoPerfilUseCase;
 import com.playzone.pems.application.usuario.port.in.CompletarPerfilClienteUseCase;
 import com.playzone.pems.application.usuario.port.in.ActivarClientePerfilUseCase;
+import com.playzone.pems.application.usuario.port.in.ConfirmarCambioCorreoUseCase;
 import com.playzone.pems.application.usuario.port.in.DesactivarClientePerfilUseCase;
 import com.playzone.pems.application.usuario.port.in.HacerVipPerfilUseCase;
 import com.playzone.pems.application.usuario.port.in.ListarClientesPerfilUseCase;
@@ -25,6 +26,7 @@ import com.playzone.pems.infrastructure.security.SupabaseAuthContext;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.interfaces.rest.usuario.request.ActualizarClientePerfilRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.CompletarPerfilClienteRequest;
+import com.playzone.pems.interfaces.rest.usuario.request.ConfirmarCambioCorreoRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.HacerVipRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.RegistrarClientePerfilRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.RegistrarClientePublicoRequest;
@@ -73,6 +75,7 @@ public class ClienteController {
     private final RegistrarVisitaPerfilUseCase   visitaUseCase;
     private final ActualizarSegmentoPerfilUseCase segmentoUseCase;
     private final CompletarPerfilClienteUseCase  completarUseCase;
+    private final ConfirmarCambioCorreoUseCase   confirmarCambioCorreoUseCase;
     private final SupabaseAuthFacade             supabaseAuthFacade;
     private final StoragePort storagePort;
     private final String bucketPublico;
@@ -91,6 +94,7 @@ public class ClienteController {
             RegistrarVisitaPerfilUseCase visitaUseCase,
             ActualizarSegmentoPerfilUseCase segmentoUseCase,
             CompletarPerfilClienteUseCase completarUseCase,
+            ConfirmarCambioCorreoUseCase confirmarCambioCorreoUseCase,
             SupabaseAuthFacade supabaseAuthFacade,
             StoragePort storagePort,
             @Value("${supabase.storage.bucket-publico}") String bucketPublico) {
@@ -107,6 +111,7 @@ public class ClienteController {
         this.visitaUseCase = visitaUseCase;
         this.segmentoUseCase = segmentoUseCase;
         this.completarUseCase = completarUseCase;
+        this.confirmarCambioCorreoUseCase = confirmarCambioCorreoUseCase;
         this.supabaseAuthFacade = supabaseAuthFacade;
         this.storagePort = storagePort;
         this.bucketPublico = bucketPublico;
@@ -180,6 +185,18 @@ public class ClienteController {
                         .build());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(toResponse(perfil)));
+    }
+
+    @PostMapping("/me/correo/confirmar")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> confirmarCambioCorreo(
+            @Valid @RequestBody ConfirmarCambioCorreoRequest request) {
+
+        Long clienteId = supabaseAuthFacade.clientePerfilId()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No autenticado"));
+
+        confirmarCambioCorreoUseCase.confirmar(clienteId, request.getToken());
+        return ResponseEntity.ok(ApiResponse.noContent());
     }
 
     @GetMapping
