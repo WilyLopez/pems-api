@@ -1,6 +1,5 @@
 package com.playzone.pems.interfaces.rest.usuario.request;
 
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -41,20 +40,4 @@ public class RegistrarUsuarioAdminRequest {
         message = "El teléfono debe comenzar con 9 y tener exactamente 9 dígitos"
     )
     private String telefono;
-
-    private boolean generarPassword;
-
-    @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
-    private String password;
-
-    @AssertTrue(message = "La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial (!@#$%&*?)")
-    public boolean isPasswordValida() {
-        if (generarPassword) return true;
-        if (password == null || password.length() < 8) return false;
-        boolean tieneUpper    = password.chars().anyMatch(Character::isUpperCase);
-        boolean tieneLower    = password.chars().anyMatch(Character::isLowerCase);
-        boolean tieneDigit    = password.chars().anyMatch(Character::isDigit);
-        boolean tieneEspecial = password.chars().anyMatch(c -> "!@#$%&*?".indexOf(c) >= 0);
-        return tieneUpper && tieneLower && tieneDigit && tieneEspecial;
-    }
 }

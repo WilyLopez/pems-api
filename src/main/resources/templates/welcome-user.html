@@ -41,7 +41,7 @@
               <p style="margin:0;font-size:15px;color:#475569;line-height:1.7;">
                 Tu cuenta de acceso al panel administrativo de
                 <strong style="color:#00AEEF;">Kiki y Lala</strong> ha sido creada.
-                A continuación encontrarás tus credenciales.
+                Activa tu cuenta y crea tu contraseña para comenzar.
               </p>
             </td>
           </tr>
@@ -85,45 +85,23 @@
                       style="background:#1A1A2E;padding:11px 20px;">
                     <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1.5px;
                                text-transform:uppercase;color:rgba(255,255,255,0.65);">
-                      &#128272;&nbsp;&nbsp;Credenciales de acceso
+                      &#128272;&nbsp;&nbsp;Cuenta de acceso
                     </p>
                   </td>
                 </tr>
 
                 <!-- Usuario -->
                 <tr>
-                  <td style="padding:15px 20px 8px;width:36%;vertical-align:middle;">
+                  <td style="padding:15px 20px;width:36%;vertical-align:middle;">
                     <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.8px;
                                text-transform:uppercase;color:#94a3b8;">
                       Usuario
                     </p>
                   </td>
-                  <td style="padding:15px 20px 8px;vertical-align:middle;">
+                  <td style="padding:15px 20px;vertical-align:middle;">
                     <p style="margin:0;font-size:14px;font-weight:600;color:#1A1A2E;
                                font-family:'Courier New',Courier,monospace;">
                       {{correo}}
-                    </p>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td colspan="2" style="padding:0 20px;">
-                    <hr style="border:none;border-top:1px solid #e2e8f0;margin:0;"/>
-                  </td>
-                </tr>
-
-                <!-- Contraseña -->
-                <tr>
-                  <td style="padding:12px 20px 16px;vertical-align:middle;">
-                    <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.8px;
-                               text-transform:uppercase;color:#94a3b8;">
-                      Contraseña
-                    </p>
-                  </td>
-                  <td style="padding:12px 20px 16px;vertical-align:middle;">
-                    <p style="margin:0;font-size:18px;font-weight:900;letter-spacing:3px;
-                               color:#0077a8;font-family:'Courier New',Courier,monospace;">
-                      {{password}}
                     </p>
                   </td>
                 </tr>
@@ -140,9 +118,9 @@
                 <tr>
                   <td>
                     <p style="margin:0;font-size:13px;color:#92400e;line-height:1.6;">
-                      &#9888;&#65039;&nbsp; <strong>Esta es una contraseña temporal.</strong>
-                      Deberás cambiarla al iniciar sesión por primera vez.
-                      No la compartas y elimina este correo una vez que hayas accedido.
+                      &#9888;&#65039;&nbsp; <strong>Este enlace es de un solo uso y expira en 24 horas.</strong>
+                      Si no activas tu cuenta dentro de ese plazo, deberás solicitar a un administrador
+                      que te reenvíe la invitación.
                     </p>
                   </td>
                 </tr>
@@ -155,7 +133,7 @@
             <td style="padding:24px 40px 0;">
               <p style="margin:0 0 14px;font-size:12px;font-weight:700;color:#1A1A2E;
                          text-transform:uppercase;letter-spacing:0.6px;">
-                Cómo acceder al panel
+                Cómo activar tu cuenta
               </p>
 
               <!-- Paso 1 -->
@@ -170,7 +148,7 @@
                   </td>
                   <td style="padding-left:10px;vertical-align:top;">
                     <p style="margin:0;font-size:13px;color:#475569;line-height:1.6;">
-                      Haz clic en el botón <strong style="color:#1A1A2E;">Ingresar al panel</strong>.
+                      Haz clic en el botón <strong style="color:#1A1A2E;">Activar mi cuenta</strong>.
                     </p>
                   </td>
                 </tr>
@@ -188,8 +166,7 @@
                   </td>
                   <td style="padding-left:10px;vertical-align:top;">
                     <p style="margin:0;font-size:13px;color:#475569;line-height:1.6;">
-                      Inicia sesión con tu correo <strong style="color:#1A1A2E;">{{correo}}</strong>
-                      y la contraseña temporal.
+                      Crea tu <strong style="color:#1A1A2E;">nueva contraseña segura</strong>.
                     </p>
                   </td>
                 </tr>
@@ -206,7 +183,8 @@
                   </td>
                   <td style="padding-left:10px;vertical-align:top;">
                     <p style="margin:0;font-size:13px;color:#475569;line-height:1.6;">
-                      El sistema te solicitará crear una <strong style="color:#1A1A2E;">nueva contraseña segura</strong>.
+                      Ingresa al panel con tu correo <strong style="color:#1A1A2E;">{{correo}}</strong>
+                      y la contraseña que acabas de crear.
                     </p>
                   </td>
                 </tr>
@@ -218,13 +196,13 @@
           <!-- ═══ BOTÓN CTA ═══ -->
           <tr>
             <td style="padding:28px 40px 10px;text-align:center;">
-              <a href="{{loginUrl}}"
+              <a href="{{activationUrl}}"
                  style="display:inline-block;
                         background:linear-gradient(135deg,#0098d4 0%,#00AEEF 100%);
                         color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;
                         padding:14px 48px;border-radius:50px;letter-spacing:0.3px;
                         box-shadow:0 4px 18px rgba(0,174,239,0.45);">
-                Ingresar al panel &rarr;
+                Activar mi cuenta &rarr;
               </a>
             </td>
           </tr>
