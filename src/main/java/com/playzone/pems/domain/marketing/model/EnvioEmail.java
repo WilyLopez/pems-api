@@ -16,6 +16,7 @@ public class EnvioEmail {
     private Long    idCliente;
     private String  destinatario;
     private String  asunto;
+    private String  cuerpoHtml;
     private String  estado;
     private int     intentos;
     private Instant fechaEnvio;

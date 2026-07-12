@@ -5,4 +5,5 @@ public interface StoragePort {
     void delete(String bucket, String key);
     void deleteByUrl(String url);
     String getUrlPublica(String bucket, String key);
+    byte[] downloadByUrl(String url);
 }

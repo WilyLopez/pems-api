@@ -42,6 +42,8 @@ public interface ClientePerfilRepository {
 
     void reactivar(Long id);
 
+    void desactivarComunicaciones(Long id);
+
     void sumarTotalGastado(Long id, BigDecimal monto);
 
     List<ClientePerfil> buscarDestinatariosCampana(CampanaDestinatariosQuery query);

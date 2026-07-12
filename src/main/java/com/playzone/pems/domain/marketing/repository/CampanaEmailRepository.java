@@ -15,6 +15,8 @@ public interface CampanaEmailRepository {
 
     List<CampanaEmail> findProgramadasParaEnviar();
 
+    List<CampanaEmail> findByEstado(String estado);
+
     CampanaEmail save(CampanaEmail campana);
 
     void actualizarEstado(Long id, String estado);

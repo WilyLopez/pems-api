@@ -12,6 +12,8 @@ public interface NotificacionRepository {
 
     Optional<Notificacion> findById(Long id);
 
+    Optional<Notificacion> findUltimaPorEntidad(String entidadTipo, Long entidadId);
+
     Page<Notificacion> findFeedUsuario(UUID usuarioId, boolean soloNoLeidas, Pageable pageable);
 
     Page<Notificacion> findFeedCliente(Long clienteId, boolean soloNoLeidas, Pageable pageable);

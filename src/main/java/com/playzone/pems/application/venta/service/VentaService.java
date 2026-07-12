@@ -1,8 +1,11 @@
 package com.playzone.pems.application.venta.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.auditoria.AuditoriaConstants;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.evento.dto.query.ReservaPublicaQuery;
+import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
+import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.application.venta.dto.query.VentaDetalleQuery;
 import com.playzone.pems.application.venta.dto.command.CobrarReservaCommand;
 import com.playzone.pems.application.venta.dto.command.PagoMostradorCommand;
@@ -33,6 +36,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +50,8 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
     private final ConfiguracionCalendarioRepository configRepository;
     private final EnrutadorCajaService     enrutadorCajaService;
     private final RegistrarLogUseCase      auditoria;
+    private final CrearNotificacionPort    crearNotificacionPort;
+    private final ObjectMapper             objectMapper;
 
     @Override
     @Transactional
@@ -197,7 +203,30 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
         if (destinatario == null || destinatario.trim().isEmpty()) {
             throw new ValidationException("No se encontro un correo destinatario para enviar los documentos.");
         }
-        enviarDocumentosVentaPort.enviarDocumentos(destinatario.trim(), detalle);
+        destinatario = destinatario.trim();
+
+        if (detalle.getClienteId() != null) {
+            String metadataJson;
+            try {
+                metadataJson = objectMapper.writeValueAsString(Map.of("destinatario", destinatario));
+            } catch (Exception e) {
+                throw new IllegalStateException("No se pudo serializar el destinatario del comprobante.", e);
+            }
+
+            crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                    .tipoCodigo("DOCUMENTO_LISTO")
+                    .destinatarioClienteId(detalle.getClienteId())
+                    .entidadTipo("venta")
+                    .entidadId(idVenta)
+                    .datosExtra(Map.of(
+                            "tipo_comprobante", "comprobante",
+                            "numero", String.valueOf(idVenta),
+                            "monto", detalle.getTotal().toPlainString()))
+                    .metadata(metadataJson)
+                    .build());
+        } else {
+            enviarDocumentosVentaPort.enviarDocumentos(destinatario, detalle);
+        }
 
         Venta v = ventaRepository.findById(idVenta)
                 .orElseThrow(() -> new VentaNotFoundException(idVenta));
