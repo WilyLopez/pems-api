@@ -9,7 +9,6 @@ import com.playzone.pems.application.evento.port.in.CancelarReservaUseCase;
 import com.playzone.pems.application.evento.port.in.ConsultarReservasUseCase;
 import com.playzone.pems.application.evento.port.in.CrearReservaPublicaUseCase;
 import com.playzone.pems.application.evento.port.in.ReprogramarReservaUseCase;
-import com.playzone.pems.application.evento.port.out.EnviarTicketPorCorreoPort;
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
 import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.domain.calendario.exception.AforoExcedidoException;
@@ -40,6 +39,7 @@ import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.util.FechaUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -71,7 +71,6 @@ public class ReservaPublicaService
     private final FeriadoRepository                 feriadoRepository;
     private final BloqueCalendarioRepository        bloqueRepository;
     private final ConfiguracionCalendarioRepository configRepository;
-    private final EnviarTicketPorCorreoPort         correoPort;
     private final StoragePort                       storagePort;
     private final VentaRepository                   ventaRepository;
     private final VentaPagoRepository               ventaPagoRepository;
@@ -80,6 +79,7 @@ public class ReservaPublicaService
     private final RegistrarLogUseCase               auditoria;
     private final CrearNotificacionPort             crearNotificacionPort;
     private final SedeScopeValidator                sedeScope;
+    private final ObjectMapper                       objectMapper;
 
     @org.springframework.beans.factory.annotation.Value("${supabase.storage.bucket-comprobantes:comprobantes}")
     private String bucketComprobantes;
@@ -188,19 +188,18 @@ public class ReservaPublicaService
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(command.getIdSede()), null, null);
-        if (cliente.getCorreo() != null) {
-            correoPort.enviarReservaPendiente(cliente.getCorreo(), cliente.nombreCompleto(), query);
-        } else {
-            log.warn("Reserva {} sin correo de cliente {}, no se envia aviso de pendiente", guardada.getId(), command.getIdCliente());
+        if (cliente.getCorreo() == null) {
+            log.warn("Reserva {} sin correo de cliente {}, no se enviará confirmación por correo", guardada.getId(), command.getIdCliente());
         }
 
-        crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                 .tipoCodigo("TICKET_DISPONIBLE")
                 .destinatarioClienteId(guardada.getIdCliente())
                 .entidadTipo("reserva_publica")
                 .entidadId(guardada.getId())
                 .datosExtra(Map.of(
                         "fecha",  guardada.getFechaEvento().toString(),
+                        "sede",   query.getNombreSede() != null ? query.getNombreSede() : "",
                         "ticket", guardada.getNumeroTicket() != null ? guardada.getNumeroTicket() : ""))
                 .build());
 
@@ -303,15 +302,21 @@ public class ReservaPublicaService
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(guardada.getIdSede()), null, null);
-        if (cliente.getCorreo() != null) {
-            if (requierePagoAdicional) {
-                correoPort.enviarReservaPendiente(cliente.getCorreo(), cliente.nombreCompleto(), query);
-            } else {
-                correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), query);
-            }
-        } else {
-            log.warn("Reprogramacion {} sin correo de cliente {}, no se envia notificacion", guardada.getId(), guardada.getIdCliente());
+        if (cliente.getCorreo() == null) {
+            log.warn("Reprogramacion {} sin correo de cliente {}, no se enviará confirmación por correo", guardada.getId(), guardada.getIdCliente());
         }
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo(requierePagoAdicional ? "TICKET_DISPONIBLE" : "PAGO_CONFIRMADO")
+                .destinatarioClienteId(guardada.getIdCliente())
+                .entidadTipo("reserva_publica")
+                .entidadId(guardada.getId())
+                .datosExtra(Map.of(
+                        "fecha",  guardada.getFechaEvento().toString(),
+                        "sede",   query.getNombreSede() != null ? query.getNombreSede() : "",
+                        "ticket", guardada.getNumeroTicket() != null ? guardada.getNumeroTicket() : "",
+                        "monto",  guardada.getTotalPagado() != null ? guardada.getTotalPagado().toPlainString() : ""))
+                .build());
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 supabaseAuthFacade.usuarioActualId().orElse(null),
@@ -356,9 +361,17 @@ public class ReservaPublicaService
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
                 fetchNombreSede(guardada.getIdSede()), null, null);
-        if (cliente.getCorreo() != null) {
-            correoPort.enviarReservaCancelada(cliente.getCorreo(), cliente.nombreCompleto(), query, motivo);
-        }
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("RESERVA_CANCELADA")
+                .destinatarioClienteId(guardada.getIdCliente())
+                .entidadTipo("reserva_publica")
+                .entidadId(guardada.getId())
+                .datosExtra(Map.of(
+                        "fecha",  guardada.getFechaEvento().toString(),
+                        "motivo", motivo != null ? motivo : "No especificado"))
+                .build());
+
         return query;
     }
 
@@ -384,7 +397,7 @@ public class ReservaPublicaService
                 .validadoAt(java.time.OffsetDateTime.now())
                 .build());
 
-        crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                 .tipoCodigo("PAGO_CONFIRMADO")
                 .destinatarioClienteId(guardada.getIdCliente())
                 .entidadTipo("reserva_publica")
@@ -394,11 +407,6 @@ public class ReservaPublicaService
                         "fecha", guardada.getFechaEvento().toString()))
                 .build());
 
-        ClientePerfil cliente = clientePerfilRepository.buscarPorId(guardada.getIdCliente())
-                .orElseThrow(() -> new ResourceNotFoundException("Cliente", guardada.getIdCliente()));
-        if (cliente.getCorreo() != null) {
-            correoPort.enviarTicket(cliente.getCorreo(), cliente.nombreCompleto(), enriquecerQuery(guardada));
-        }
         return enriquecerQuery(guardada);
     }
 
@@ -420,7 +428,7 @@ public class ReservaPublicaService
             }
         }
 
-        crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                 .tipoCodigo("PAGO_RECHAZADO")
                 .destinatarioClienteId(reserva.getIdCliente())
                 .entidadTipo("reserva_publica")
@@ -428,14 +436,19 @@ public class ReservaPublicaService
                 .datosExtra(Map.of(
                         "motivo", motivo != null ? motivo : "Comprobante invalido",
                         "fecha", reserva.getFechaEvento().toString()))
+                .metadata(serializarMetadataMotivo(motivo))
                 .build());
 
-        ClientePerfil cliente = clientePerfilRepository.buscarPorId(reserva.getIdCliente())
-                .orElseThrow(() -> new ResourceNotFoundException("Cliente", reserva.getIdCliente()));
-        if (cliente.getCorreo() != null) {
-            correoPort.enviarReservaRechazada(cliente.getCorreo(), cliente.nombreCompleto(), enriquecerQuery(reserva), motivo);
-        }
         return enriquecerQuery(reserva);
+    }
+
+    private String serializarMetadataMotivo(String motivo) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "motivo", motivo != null && !motivo.isBlank() ? motivo : "Comprobante inválido"));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return "{}";
+        }
     }
 
     @Transactional

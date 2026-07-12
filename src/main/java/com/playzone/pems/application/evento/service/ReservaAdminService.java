@@ -1,5 +1,6 @@
 package com.playzone.pems.application.evento.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.auditoria.AuditoriaConstants;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.fidelizacion.port.in.RegistrarVisitaUseCase;
@@ -8,6 +9,8 @@ import com.playzone.pems.application.evento.dto.query.ReservaPublicaQuery;
 import com.playzone.pems.application.evento.dto.query.TicketDetalleQuery;
 import com.playzone.pems.application.evento.port.in.BuscarReservasAdminUseCase;
 import com.playzone.pems.application.evento.port.in.ConfirmarIngresoUseCase;
+import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
+import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.domain.calendario.model.ConfiguracionCalendario;
 import com.playzone.pems.domain.calendario.repository.BloqueCalendarioRepository;
 import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
@@ -33,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -52,6 +56,8 @@ public class ReservaAdminService
     private final SupabaseAuthFacade                authFacade;
     private final RegistrarLogUseCase               auditoria;
     private final SedeScopeValidator                sedeScope;
+    private final CrearNotificacionPort             crearNotificacionPort;
+    private final ObjectMapper                      objectMapper;
 
     @Override
     @Transactional
@@ -93,6 +99,8 @@ public class ReservaAdminService
                 EstadoReservaPublica.CONFIRMADA.getCodigo(), "COMPLETADA",
                 "Ingreso confirmado para reserva #" + idReserva,
                 null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        notificarIngresoConfirmado(guardada.getIdCliente(), guardada.getId(), guardada.getNumeroTicket());
 
         return toQuery(guardada, nombre, null,
                 fetchMedioPago(guardada.getVentaId()), fetchReferenciaPago(guardada.getVentaId()));
@@ -175,7 +183,19 @@ public class ReservaAdminService
                 .estado(EstadoReservaPublica.COMPLETADA)
                 .ingresoAt(OffsetDateTime.now(ZoneId.of("America/Lima")))
                 .build();
-        return toDetalle(reservaRepository.save(actualizada));
+        ReservaPublica guardada = reservaRepository.save(actualizada);
+
+        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+                authFacade.usuarioActualId().orElse(null),
+                AuditoriaConstants.ACCION_CONFIRMAR, AuditoriaConstants.MOD_RESERVAS,
+                "ReservaPublica", idReserva,
+                r.getEstado().getCodigo(), "COMPLETADA",
+                "Ingreso confirmado para ticket " + guardada.getNumeroTicket(),
+                null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        notificarIngresoConfirmado(guardada.getIdCliente(), guardada.getId(), guardada.getNumeroTicket());
+
+        return toDetalle(guardada);
     }
 
     @Transactional
@@ -228,7 +248,36 @@ public class ReservaAdminService
                 "Reserva #" + idReserva + " reprogramada: " + r.getFechaEvento() + " → " + nuevaFecha,
                 null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
 
+        String metadataJson;
+        try {
+            metadataJson = objectMapper.writeValueAsString(Map.of("fechaAnterior", r.getFechaEvento().toString()));
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo serializar la fecha anterior de la reserva.", e);
+        }
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("RESERVA_REPROGRAMADA")
+                .destinatarioClienteId(r.getIdCliente())
+                .entidadTipo("RESERVA")
+                .entidadId(idReserva)
+                .datosExtra(Map.of(
+                        "ticket", r.getNumeroTicket(),
+                        "fechaAnterior", r.getFechaEvento().toString(),
+                        "fechaNueva", nuevaFecha.toString()))
+                .metadata(metadataJson)
+                .build());
+
         return resultado;
+    }
+
+    private void notificarIngresoConfirmado(Long idCliente, Long idReserva, String numeroTicket) {
+        crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+                .tipoCodigo("RESERVA_INGRESO_CONFIRMADO")
+                .destinatarioClienteId(idCliente)
+                .entidadTipo("RESERVA")
+                .entidadId(idReserva)
+                .datosExtra(Map.of("ticket", numeroTicket != null ? numeroTicket : ""))
+                .build());
     }
 
     private TicketDetalleQuery toDetalle(ReservaPublica r) {
