@@ -18,7 +18,7 @@ Cada sede opera de forma independiente en cuanto a caja, ventas y reportes. Un u
 |---|---|
 | `SUPERADMIN` / `ADMIN` | Acceso a todas las sedes, aprobación de egresos, cierres forzados de caja, reportes globales. |
 | Staff de sede (cajero, recepción, gestor de eventos) | Acceso restringido a su propia sede (caja, ventas, reservas, eventos, ingresos/egresos). Cada acción sobre un recurso valida que ese recurso pertenezca a la sede del usuario. |
-| `CLIENTE` | Usuario final. Puede crear sus propias reservas/eventos, consultar su propio historial, revisar y firmar contratos, y subir comprobantes de pago. No tiene sede asignada: sus permisos se validan por titularidad (es su propio registro), no por sede. |
+| `CLIENTE` | Usuario final. Puede crear sus propias reservas/eventos, consultar su propio historial, ver y descargar el contrato en PDF de sus eventos privados (cargado por el staff, sin capacidad de edición ni firma electrónica), y subir comprobantes de pago. No tiene sede asignada: sus permisos se validan por titularidad (es su propio registro), no por sede. |
 
 ### 1.2 Permisos por módulo (autoridades)
 
