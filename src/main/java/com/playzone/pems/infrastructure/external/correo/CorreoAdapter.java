@@ -2,17 +2,18 @@ package com.playzone.pems.infrastructure.external.correo;
 
 import com.playzone.pems.application.cms.port.in.GestionarConfiguracionPublicaUseCase;
 import com.playzone.pems.application.evento.dto.query.EventoPrivadoQuery;
-import com.playzone.pems.application.evento.dto.query.ReservaPublicaQuery;
 import com.playzone.pems.application.evento.port.out.EnviarNotificacionEventoPort;
-import com.playzone.pems.application.evento.port.out.EnviarTicketPorCorreoPort;
+import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
 import com.playzone.pems.application.venta.dto.query.VentaDetalleQuery;
 import com.playzone.pems.application.venta.dto.query.VentaQuery;
 import com.playzone.pems.application.venta.port.out.EnviarDocumentosVentaPort;
+import com.playzone.pems.domain.usuario.model.PerfilUsuario;
+import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
 import com.playzone.pems.infrastructure.pdf.NotaVentaPdfService;
 import com.playzone.pems.infrastructure.pdf.TicketIngresoPdfService;
-import com.playzone.pems.application.usuario.port.out.EnviarCorreoBienvenidaPort;
 import com.playzone.pems.infrastructure.template.TemplateService;
+import com.playzone.pems.shared.util.HtmlEscapeUtil;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,14 +27,13 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CorreoAdapter
-        implements EnviarTicketPorCorreoPort,
-        EnviarNotificacionEventoPort,
-        EnviarCorreoBienvenidaPort,
+        implements EnviarNotificacionEventoPort,
         EnviarDocumentosVentaPort {
 
     private final JavaMailCorreoClient            correoClient;
@@ -43,149 +43,18 @@ public class CorreoAdapter
     private final SedeRepository                  sedeRepository;
     private final TemplateService                 templateService;
     private final GestionarConfiguracionPublicaUseCase configuracionPublica;
+    private final ResolverAdministradoresPort     resolverAdministradoresPort;
+    private final PerfilUsuarioRepository         perfilUsuarioRepository;
 
     @Value("${playzone.correo.remitente}")
     private String remitente;
 
-    @Value("${playzone.correo.alertas-admin:}")
-    private String adminEmailOverride;
-
-    @Value("${playzone.url-login:http://localhost:3000/auth/login}")
-    private String loginUrl;
-
-    @Async("asyncExecutor")
-    @Override
-    public void enviarCredencialesUsuario(String correo, String nombre, String password,
-                                          String rolLabel, String sedeNombre) {
-        String asunto = "Bienvenido al Panel Administrativo — Kiki y Lala";
-
-        Map<String, String> variables = Map.of(
-                "nombre",    nombre != null ? nombre : "",
-                "correo",    correo != null ? correo : "",
-                "password",  password != null ? password : "",
-                "rol",       rolLabel != null ? rolLabel : "",
-                "sede",      sedeNombre != null ? sedeNombre : "Sede Principal",
-                "loginUrl",  loginUrl != null ? loginUrl : ""
-        );
-
-        String cuerpoHtml = templateService.procesarTemplate("welcome-user", variables);
-        correoClient.enviarConLogo(correo, asunto, cuerpoHtml);
-    }
-
-    @Async("asyncExecutor")
-    @Override
-    public void enviarTicket(String destinatario, String nombreCliente, ReservaPublicaQuery reserva) {
-        String nombreSede = sedeRepository.findById(reserva.getIdSede())
-                .map(s -> s.getNombre())
-                .orElse("Sede Principal");
-
-        byte[] pdfTicket = ticketIngresoPdfService.generarTicketPdf(reserva, nombreSede);
-
-        try {
-            String nombreRemitente = configuracionPublica.obtener().getNombreNegocio();
-            if (nombreRemitente == null || nombreRemitente.isBlank()) {
-                nombreRemitente = "PlayZone";
-            }
-
-            MimeMessage mensaje = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mensaje, true, "UTF-8");
-            helper.setFrom(remitente, nombreRemitente);
-            helper.setTo(destinatario);
-            helper.setSubject("Tu ticket Kiki y Lala — " + reserva.getNumeroTicket());
-
-            Map<String, String> variables = Map.of(
-                    "nombreCliente", nombreCliente,
-                    "numeroTicket",  reserva.getNumeroTicket(),
-                    "fecha",         reserva.getFechaEvento().toString(),
-                    "total",         reserva.getTotalPagado().toString()
-            );
-            String cuerpoHtml = templateService.procesarTemplate("email-ticket", variables);
-
-            helper.setText(cuerpoHtml, true);
-            helper.addAttachment(
-                "Ticket-" + reserva.getNumeroTicket() + ".pdf",
-                new ByteArrayResource(pdfTicket),
-                "application/pdf"
-            );
-
-            mailSender.send(mensaje);
-            log.info("Ticket PDF enviado a {}: {}", destinatario, reserva.getNumeroTicket());
-        } catch (Exception e) {
-            log.error("Error al enviar ticket a {}: {}", destinatario, e.getMessage(), e);
-            throw new RuntimeException("Error al enviar el ticket por correo.", e);
-        }
-    }
-
-    @Async("asyncExecutor")
-    @Override
-    public void notificarSolicitudRecibida(String destinatario, EventoPrivadoQuery evento) {
-        String asunto = "Solicitud de evento privado recibida — Kiki y Lala";
-        String cuerpo = htmlBase(
-            "Solicitud recibida",
-            "<p>Hola <b>" + evento.getNombreCliente() + "</b>,</p>"
-            + "<p>Hemos recibido tu solicitud de evento privado. Nuestro equipo se pondrá en contacto contigo en menos de 24 horas.</p>"
-            + resumenEvento(evento)
-            + "<p style='color:#64748b;font-size:13px;margin-top:20px;'>Próximos pasos: te confirmaremos disponibilidad, precio y condiciones por este medio.</p>"
-        );
-        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
-    }
-
-    @Async("asyncExecutor")
-    @Override
-    public void notificarEventoConfirmado(String destinatario, EventoPrivadoQuery evento) {
-        String asunto = "Tu evento privado ha sido confirmado — Kiki y Lala";
-        String cuerpo = htmlBase(
-            "¡Evento confirmado!",
-            "<p>Hola <b>" + evento.getNombreCliente() + "</b>,</p>"
-            + "<p>Tu evento ha sido confirmado. Te compartimos el resumen:</p>"
-            + resumenEvento(evento)
-            + filaFinanciera("Total contratado", "S/ " + evento.getPrecioTotalContrato())
-            + filaFinanciera("Adelanto pagado", "S/ " + evento.getMontoAdelanto())
-            + filaFinanciera("Saldo pendiente", "S/ " + evento.getMontoSaldo())
-            + "<p style='color:#64748b;font-size:13px;margin-top:16px;'>El contrato será enviado próximamente. El saldo pendiente se abona el día del evento.</p>"
-        );
-        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
-    }
-
-    @Async("asyncExecutor")
-    @Override
-    public void notificarEventoCancelado(String destinatario, EventoPrivadoQuery evento, String motivo) {
-        String asunto = "Evento privado cancelado — Kiki y Lala";
-        String cuerpo = htmlBase(
-            "Evento cancelado",
-            "<p>Hola <b>" + evento.getNombreCliente() + "</b>,</p>"
-            + "<p>Lamentamos informarte que el evento del <b>" + evento.getFechaEvento() + "</b> ha sido cancelado.</p>"
-            + "<p><b>Motivo:</b> " + motivo + "</p>"
-            + "<p style='color:#64748b;font-size:13px;'>Si tienes dudas, contáctanos por WhatsApp o correo.</p>"
-        );
-        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
-    }
-
-    @Async("asyncExecutor")
-    @Override
-    public void notificarAbonoRecibido(String destinatario, EventoPrivadoQuery evento,
-                                       java.math.BigDecimal montoAbonado, java.math.BigDecimal saldoRestante) {
-        String asunto = "Abono recibido — Kiki y Lala";
-        String cuerpo = htmlBase(
-            "Abono recibido",
-            "<p>Hola <b>" + evento.getNombreCliente() + "</b>,</p>"
-            + "<p>Hemos registrado tu abono para el evento del <b>" + evento.getFechaEvento() + "</b>.</p>"
-            + filaFinanciera("Monto abonado", "S/ " + montoAbonado)
-            + filaFinanciera("Saldo pendiente", "S/ " + saldoRestante)
-            + "<p style='color:#64748b;font-size:13px;margin-top:16px;'>Gracias por tu pago.</p>"
-        );
-        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
-    }
-
     @Async("asyncExecutor")
     @Override
     public void notificarAdminNuevaSolicitud(EventoPrivadoQuery evento) {
-        String correoAdmin = adminEmailOverride;
-        if (correoAdmin == null || correoAdmin.isBlank()) {
-            correoAdmin = configuracionPublica.obtener().getCorreo();
-        }
-        if (correoAdmin == null || correoAdmin.isBlank()) {
-            log.warn("correo admin no configurado, omitiendo notificacion de nueva solicitud");
+        List<String> correosAdmin = resolverCorreosAdministradores();
+        if (correosAdmin.isEmpty()) {
+            log.warn("no hay administradores activos, omitiendo notificacion de nueva solicitud");
             return;
         }
         String asunto = "[Nueva solicitud] " + evento.getTipoEvento() + " — " + evento.getFechaEvento();
@@ -193,53 +62,23 @@ public class CorreoAdapter
             "Nueva solicitud de evento",
             "<p>Se ha recibido una nueva solicitud de evento privado:</p>"
             + resumenEvento(evento)
-            + "<p><b>Cliente:</b> " + evento.getNombreCliente() + "</p>"
-            + "<p><b>Correo:</b> " + evento.getCorreoCliente() + "</p>"
-            + "<p><b>Teléfono:</b> " + (evento.getTelefonoCliente() != null ? evento.getTelefonoCliente() : "—") + "</p>"
+            + "<p><b>Cliente:</b> " + HtmlEscapeUtil.escapar(evento.getNombreCliente()) + "</p>"
+            + "<p><b>Correo:</b> " + HtmlEscapeUtil.escapar(evento.getCorreoCliente()) + "</p>"
+            + "<p><b>Teléfono:</b> " + (evento.getTelefonoCliente() != null ? HtmlEscapeUtil.escapar(evento.getTelefonoCliente()) : "—") + "</p>"
             + "<p style='margin-top:16px;'><a href='#' style='background:#00AEEF;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;'>Ver en el panel</a></p>"
         );
-        correoClient.enviar(correoAdmin, asunto, cuerpo);
+        for (String correoAdmin : correosAdmin) {
+            correoClient.enviar(correoAdmin, asunto, cuerpo);
+        }
     }
 
-    @Async("asyncExecutor")
-    @Override
-    public void enviarReservaPendiente(String destinatario, String nombreCliente, ReservaPublicaQuery reserva) {
-        String asunto = "Reserva pendiente de confirmacion — Kiki y Lala";
-        String cuerpo = htmlBase(
-            "Reserva pendiente",
-            "<p>Hola <b>" + nombreCliente + "</b>,</p>"
-            + "<p>Tu reserva <b>#" + reserva.getNumeroTicket() + "</b> para el dia <b>" + reserva.getFechaEvento() + "</b> ha sido recibida y esta pendiente de confirmacion.</p>"
-            + "<p style='color:#64748b;font-size:13px;'>Nuestro equipo revisara tu solicitud y te notificaremos a la brevedad.</p>"
-        );
-        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
-    }
-
-    @Async("asyncExecutor")
-    @Override
-    public void enviarReservaRechazada(String destinatario, String nombreCliente, ReservaPublicaQuery reserva, String motivo) {
-        String asunto = "Reserva rechazada — Kiki y Lala";
-        String cuerpo = htmlBase(
-            "Reserva rechazada",
-            "<p>Hola <b>" + nombreCliente + "</b>,</p>"
-            + "<p>Tu reserva para el dia <b>" + reserva.getFechaEvento() + "</b> no pudo ser aprobada.</p>"
-            + (motivo != null ? "<p><b>Motivo:</b> " + motivo + "</p>" : "")
-            + "<p style='color:#64748b;font-size:13px;'>Si tienes dudas, contactanos por WhatsApp o correo.</p>"
-        );
-        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
-    }
-
-    @Async("asyncExecutor")
-    @Override
-    public void enviarReservaCancelada(String destinatario, String nombreCliente, ReservaPublicaQuery reserva, String motivo) {
-        String asunto = "Reserva cancelada — Kiki y Lala";
-        String cuerpo = htmlBase(
-            "Reserva cancelada",
-            "<p>Hola <b>" + nombreCliente + "</b>,</p>"
-            + "<p>Tu reserva <b>#" + reserva.getNumeroTicket() + "</b> para el dia <b>" + reserva.getFechaEvento() + "</b> ha sido cancelada.</p>"
-            + (motivo != null ? "<p><b>Motivo:</b> " + motivo + "</p>" : "")
-            + "<p style='color:#64748b;font-size:13px;'>Si deseas reagendar, escribenos por WhatsApp.</p>"
-        );
-        correoClient.enviarConLogo(destinatario, asunto, cuerpo);
+    private List<String> resolverCorreosAdministradores() {
+        return resolverAdministradoresPort.obtenerIdsAdministradoresActivos().stream()
+                .map(perfilUsuarioRepository::buscarPorId)
+                .flatMap(Optional::stream)
+                .map(PerfilUsuario::getCorreo)
+                .filter(correo -> correo != null && !correo.isBlank())
+                .toList();
     }
 
     private String htmlBase(String titulo, String contenido) {
@@ -265,13 +104,6 @@ public class CorreoAdapter
         return "<p style='margin:6px 0;'><span style='color:#64748b;'>" + label + ":</span> <b>" + valor + "</b></p>";
     }
 
-    private String filaFinanciera(String label, String valor) {
-        return "<p style='margin:6px 0;display:flex;justify-content:space-between;'>"
-            + "<span style='color:#64748b;'>" + label + "</span>"
-            + "<b style='color:#1A1A2E;'>" + valor + "</b></p>";
-    }
-
-    @Async("asyncExecutor")
     @Override
     public void enviarDocumentos(String destinatario, VentaDetalleQuery ventaDetalle) {
         String nombreSede = sedeRepository.findById(ventaDetalle.getIdSede())

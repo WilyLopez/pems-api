@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Slf4j
@@ -50,12 +51,8 @@ public class SupabaseStorageAdapter implements StoragePort {
     @Override
     public void deleteByUrl(String url) {
         try {
-            String base = urlPublica.endsWith("/") ? urlPublica : urlPublica + "/";
-            String bucketAndKey = url.startsWith(base)
-                    ? url.substring(base.length())
-                    : url.substring(url.indexOf("/object/public/") + "/object/public/".length());
-            int slash = bucketAndKey.indexOf('/');
-            delete(bucketAndKey.substring(0, slash), bucketAndKey.substring(slash + 1));
+            String[] bucketYKey = parseBucketYKey(url);
+            delete(bucketYKey[0], bucketYKey[1]);
         } catch (Exception e) {
             log.warn("No se pudo eliminar por URL {}: {}", url, e.getMessage());
         }
@@ -65,5 +62,24 @@ public class SupabaseStorageAdapter implements StoragePort {
     public String getUrlPublica(String bucket, String key) {
         String base = urlPublica.endsWith("/") ? urlPublica : urlPublica + "/";
         return base + bucket + "/" + key;
+    }
+
+    @Override
+    public byte[] downloadByUrl(String url) {
+        String[] bucketYKey = parseBucketYKey(url);
+        return s3Client.getObjectAsBytes(GetObjectRequest.builder()
+                        .bucket(bucketYKey[0])
+                        .key(bucketYKey[1])
+                        .build())
+                .asByteArray();
+    }
+
+    private String[] parseBucketYKey(String url) {
+        String base = urlPublica.endsWith("/") ? urlPublica : urlPublica + "/";
+        String bucketAndKey = url.startsWith(base)
+                ? url.substring(base.length())
+                : url.substring(url.indexOf("/object/public/") + "/object/public/".length());
+        int slash = bucketAndKey.indexOf('/');
+        return new String[]{bucketAndKey.substring(0, slash), bucketAndKey.substring(slash + 1)};
     }
 }
