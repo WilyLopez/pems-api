@@ -320,12 +320,18 @@ public class ClientePerfilService
             numeroDocumento = nuevoDocumento;
         }
 
+        if (command.getFechaNacimiento() != null
+                && command.getFechaNacimiento().isAfter(java.time.LocalDate.now().minusYears(12))) {
+            throw new ValidationException("fechaNacimiento", "Debe tener al menos 12 años.");
+        }
+
         ClientePerfil actualizado = existente.toBuilder()
                 .nombres(command.getNombres() != null ? command.getNombres() : existente.getNombres())
                 .apellidoPaterno(command.getApellidoPaterno() != null ? command.getApellidoPaterno() : existente.getApellidoPaterno())
                 .apellidoMaterno(command.getApellidoMaterno() != null ? command.getApellidoMaterno() : existente.getApellidoMaterno())
                 .telefono(command.getTelefono() != null ? command.getTelefono() : existente.getTelefono())
                 .numeroDocumento(numeroDocumento)
+                .fechaNacimiento(command.getFechaNacimiento() != null ? command.getFechaNacimiento() : existente.getFechaNacimiento())
                 .correo(primerCorreo ? command.getCorreo() : existente.getCorreo())
                 .aceptaComunicaciones(command.getAceptaComunicaciones() != null
                         ? command.getAceptaComunicaciones()

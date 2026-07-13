@@ -261,6 +261,7 @@ public class ClienteController {
                         .telefono(request.getTelefono())
                         .numeroDocumento(request.getNumeroDocumento())
                         .correo(request.getCorreo())
+                        .fechaNacimiento(request.getFechaNacimiento())
                         .aceptaComunicaciones(request.getAceptaComunicaciones())
                         .build());
 
@@ -380,6 +381,7 @@ public class ClienteController {
                 .nombreCompleto(p.nombreCompleto())
                 .correo(p.getCorreo())
                 .telefono(p.getTelefono())
+                .fechaNacimiento(p.getFechaNacimiento())
                 .esVip(p.isEsVip())
                 .descuentoVip(p.getDescuentoVip())
                 .contadorVisitas(p.getContadorVisitas())
