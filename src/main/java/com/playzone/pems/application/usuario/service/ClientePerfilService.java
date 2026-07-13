@@ -311,11 +311,21 @@ public class ClientePerfilService
             solicitarCambioCorreo(existente, command.getCorreo());
         }
 
+        String numeroDocumento = existente.getNumeroDocumento();
+        if (numeroDocumento == null && command.getNumeroDocumento() != null && !command.getNumeroDocumento().isBlank()) {
+            String nuevoDocumento = command.getNumeroDocumento().trim();
+            clientePerfilRepository.buscarPorDocumento(existente.getTipoDocumentoCodigo(), nuevoDocumento)
+                    .filter(c -> !c.getId().equals(id))
+                    .ifPresent(c -> { throw new ValidationException("numeroDocumento", "Ya existe una cuenta con ese documento."); });
+            numeroDocumento = nuevoDocumento;
+        }
+
         ClientePerfil actualizado = existente.toBuilder()
                 .nombres(command.getNombres() != null ? command.getNombres() : existente.getNombres())
                 .apellidoPaterno(command.getApellidoPaterno() != null ? command.getApellidoPaterno() : existente.getApellidoPaterno())
                 .apellidoMaterno(command.getApellidoMaterno() != null ? command.getApellidoMaterno() : existente.getApellidoMaterno())
                 .telefono(command.getTelefono() != null ? command.getTelefono() : existente.getTelefono())
+                .numeroDocumento(numeroDocumento)
                 .correo(primerCorreo ? command.getCorreo() : existente.getCorreo())
                 .aceptaComunicaciones(command.getAceptaComunicaciones() != null
                         ? command.getAceptaComunicaciones()

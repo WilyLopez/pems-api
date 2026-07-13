@@ -27,6 +27,9 @@ public class ActualizarClientePerfilRequest {
     )
     private String telefono;
 
+    @Pattern(regexp = "^(\\d{8})?$", message = "El número de documento debe tener 8 dígitos")
+    private String numeroDocumento;
+
     @NotBlank(message = "El correo es obligatorio")
     @Email(message = "El correo debe ser válido")
     @Size(max = 254, message = "El correo no puede exceder 254 caracteres")

@@ -11,6 +11,7 @@ public class ActualizarClientePerfilCommand {
     private String  apellidoPaterno;
     private String  apellidoMaterno;
     private String  telefono;
+    private String  numeroDocumento;
     private String  correo;
     private Boolean aceptaComunicaciones;
     private String  fotoPerfilPath;

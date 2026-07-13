@@ -259,6 +259,7 @@ public class ClienteController {
                         .apellidoPaterno(request.getApellidoPaterno())
                         .apellidoMaterno(request.getApellidoMaterno())
                         .telefono(request.getTelefono())
+                        .numeroDocumento(request.getNumeroDocumento())
                         .correo(request.getCorreo())
                         .aceptaComunicaciones(request.getAceptaComunicaciones())
                         .build());
