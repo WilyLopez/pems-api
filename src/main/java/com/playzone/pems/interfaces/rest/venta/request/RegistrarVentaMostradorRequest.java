@@ -39,6 +39,9 @@ public class RegistrarVentaMostradorRequest {
     @Size(max = 15)
     private String dniAcompanante;
 
+    @Pattern(regexp = "DNI|RUC", message = "Tipo de documento del acompanante no valido.")
+    private String tipoDocumentoAcompanante;
+
     @Size(max = 15)
     private String telefonoAcompanante;
 
@@ -79,6 +82,7 @@ public class RegistrarVentaMostradorRequest {
                 .ninos(ninosCmd)
                 .nombreAcompanante(nombreAcompanante)
                 .dniAcompanante(dniAcompanante)
+                .tipoDocumentoAcompanante(tipoDocumentoAcompanante)
                 .telefonoAcompanante(telefonoAcompanante)
                 .idPromocion(idPromocion)
                 .pagos(pagosCmd)

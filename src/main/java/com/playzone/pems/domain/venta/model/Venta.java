@@ -22,6 +22,7 @@ public class Venta {
     private LocalDate     fechaVisita;
     private String        nombreAcompanante;
     private String        dniAcompanante;
+    private String        tipoDocumentoAcompanante;
     private String        telefonoAcompanante;
     private Long          promocionId;
     private BigDecimal    subtotal;
