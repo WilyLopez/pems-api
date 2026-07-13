@@ -10,17 +10,13 @@ import com.playzone.pems.application.venta.port.out.EnviarDocumentosVentaPort;
 import com.playzone.pems.domain.usuario.model.PerfilUsuario;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
+import com.playzone.pems.infrastructure.external.correo.renderizador.AdjuntoCorreo;
 import com.playzone.pems.infrastructure.pdf.NotaVentaPdfService;
 import com.playzone.pems.infrastructure.pdf.TicketIngresoPdfService;
 import com.playzone.pems.infrastructure.template.TemplateService;
 import com.playzone.pems.shared.util.HtmlEscapeUtil;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -37,7 +33,6 @@ public class CorreoAdapter
         EnviarDocumentosVentaPort {
 
     private final JavaMailCorreoClient            correoClient;
-    private final JavaMailSender                  mailSender;
     private final TicketIngresoPdfService         ticketIngresoPdfService;
     private final NotaVentaPdfService             notaVentaPdfService;
     private final SedeRepository                  sedeRepository;
@@ -45,9 +40,6 @@ public class CorreoAdapter
     private final GestionarConfiguracionPublicaUseCase configuracionPublica;
     private final ResolverAdministradoresPort     resolverAdministradoresPort;
     private final PerfilUsuarioRepository         perfilUsuarioRepository;
-
-    @Value("${playzone.correo.remitente}")
-    private String remitente;
 
     @Async("asyncExecutor")
     @Override
@@ -141,12 +133,6 @@ public class CorreoAdapter
                 nombreRemitente = "PlayZone";
             }
 
-            MimeMessage mensaje = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mensaje, true, "UTF-8");
-            helper.setFrom(remitente, nombreRemitente);
-            helper.setTo(destinatario);
-            helper.setSubject("Tus comprobantes Kiki y Lala — Venta #" + ventaDetalle.getId());
-
             Map<String, String> variables = Map.of(
                     "nombreCliente", ventaDetalle.getNombreCliente() != null ? ventaDetalle.getNombreCliente() : "Cliente",
                     "ventaId",       ventaDetalle.getId().toString(),
@@ -155,24 +141,28 @@ public class CorreoAdapter
             );
             String cuerpoHtml = templateService.procesarTemplate("email-venta", variables);
 
-            helper.setText(cuerpoHtml, true);
-            helper.addAttachment(
-                "NotaVenta-" + ventaDetalle.getId() + ".pdf",
-                new ByteArrayResource(pdfNota),
-                "application/pdf"
-            );
+            List<AdjuntoCorreo> adjuntos = new ArrayList<>();
+            adjuntos.add(AdjuntoCorreo.builder()
+                    .nombreArchivo("NotaVenta-" + ventaDetalle.getId() + ".pdf")
+                    .contenido(pdfNota)
+                    .tipoContenido("application/pdf")
+                    .build());
 
-            List<ByteArrayResource> ticketResources = new ArrayList<>();
             for (var t : ventaDetalle.getTickets()) {
                 byte[] pdfTicket = ticketIngresoPdfService.generarTicketPdf(t, nombreSede);
-                helper.addAttachment(
-                    "Ticket-" + t.getNumeroTicket() + ".pdf",
-                    new ByteArrayResource(pdfTicket),
-                    "application/pdf"
-                );
+                adjuntos.add(AdjuntoCorreo.builder()
+                        .nombreArchivo("Ticket-" + t.getNumeroTicket() + ".pdf")
+                        .contenido(pdfTicket)
+                        .tipoContenido("application/pdf")
+                        .build());
             }
 
-            mailSender.send(mensaje);
+            correoClient.enviarConAdjuntos(
+                    destinatario,
+                    "Tus comprobantes Kiki y Lala — Venta #" + ventaDetalle.getId(),
+                    cuerpoHtml,
+                    adjuntos,
+                    nombreRemitente);
             log.info("Documentos de venta consolidada enviados por correo a {}: Venta #{}", destinatario, ventaDetalle.getId());
         } catch (Exception e) {
             log.error("Error al enviar documentos de venta consolidada a {}: {}", destinatario, e.getMessage(), e);

@@ -46,21 +46,6 @@ spring:
     encoding: UTF-8
     schemas: public
 
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:tucorreo@gmail.com}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-        debug: false
-    default-encoding: UTF-8
-
   servlet:
     multipart:
       enabled: true
@@ -144,8 +129,9 @@ supabase:
 playzone:
 
   correo:
-    remitente: ${MAIL_FROM:${MAIL_USERNAME:tucorreo@gmail.com}}
+    remitente: ${MAIL_FROM:no-reply@kikiylala.lat}
     nombre-remitente: ${MAIL_SENDER_NAME:PlayZone}
+    api-key: ${MAIL_PASSWORD:}
     alerta:
       tasa-fallo-umbral: ${CORREO_ALERTA_TASA_FALLO:0.2}
       minimo-muestra: ${CORREO_ALERTA_MINIMO_MUESTRA:5}
