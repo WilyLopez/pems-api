@@ -77,5 +77,7 @@ public interface ReservaPublicaRepository {
 
     List<ReservaPublica> findByVentaId(Long ventaId);
 
+    int countPendientesSinComprobantePorClienteYFecha(Long idCliente, LocalDate fecha);
+
     void deleteById(Long id);
 }

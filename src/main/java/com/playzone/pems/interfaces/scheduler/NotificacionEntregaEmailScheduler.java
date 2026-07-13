@@ -31,7 +31,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificacionEntregaEmailScheduler {
 
-    private static final int LOTE = 50;
+    private static final int LOTE = 20;
     private static final int MAX_INTENTOS = 3;
     private static final String TIPO_DESCONOCIDO = "desconocido";
 

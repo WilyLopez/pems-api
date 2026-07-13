@@ -66,6 +66,8 @@ public class ReservaPublicaService
         CancelarReservaUseCase,
         ConsultarReservasUseCase {
 
+    private static final int MAX_RESERVAS_SIN_COMPROBANTE_POR_FECHA = 3;
+
     private final ReservaPublicaRepository          reservaRepository;
     private final EventoPrivadoRepository           eventoRepository;
     private final ClientePerfilRepository           clientePerfilRepository;
@@ -138,6 +140,7 @@ public class ReservaPublicaService
     @Transactional
     public ReservaPublicaQuery ejecutar(CrearReservaPublicaCommand command) {
         validarFechaDisponible(command.getIdSede(), command.getFechaEvento());
+        validarLimiteReservasSinComprobante(command.getIdCliente(), command.getFechaEvento());
 
         TipoDia tipoDia = resolverTipoDia(command.getFechaEvento());
 
@@ -578,6 +581,16 @@ public class ReservaPublicaService
         int activas = reservaRepository.countActivasBySedeAndFecha(idSede, fecha);
         if (activas >= cfg.getAforoMaximo()) {
             throw new AforoExcedidoException(fecha, cfg.getAforoMaximo());
+        }
+    }
+
+    private void validarLimiteReservasSinComprobante(Long idCliente, LocalDate fecha) {
+        int pendientesSinComprobante = reservaRepository.countPendientesSinComprobantePorClienteYFecha(idCliente, fecha);
+        if (pendientesSinComprobante >= MAX_RESERVAS_SIN_COMPROBANTE_POR_FECHA) {
+            throw new ValidationException(
+                    "Ya tienes " + MAX_RESERVAS_SIN_COMPROBANTE_POR_FECHA
+                    + " reservas pendientes de pago para esta fecha. Paga y sube tu comprobante Yape, "
+                    + "o cancela alguna, para poder reservar más.");
         }
     }
 

@@ -15,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.javamail.JavaMailSender;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,7 +30,6 @@ import static org.mockito.Mockito.when;
 class CorreoAdapterTest {
 
     @Mock private JavaMailCorreoClient correoClient;
-    @Mock private JavaMailSender mailSender;
     @Mock private TicketIngresoPdfService ticketIngresoPdfService;
     @Mock private NotaVentaPdfService notaVentaPdfService;
     @Mock private SedeRepository sedeRepository;
@@ -45,7 +43,7 @@ class CorreoAdapterTest {
     @BeforeEach
     void setUp() {
         correoAdapter = new CorreoAdapter(
-                correoClient, mailSender, ticketIngresoPdfService, notaVentaPdfService,
+                correoClient, ticketIngresoPdfService, notaVentaPdfService,
                 sedeRepository, templateService, configuracionPublica,
                 resolverAdministradoresPort, perfilUsuarioRepository);
     }
