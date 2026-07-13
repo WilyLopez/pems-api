@@ -21,6 +21,7 @@ public class RegistrarVentaMostradorCommand {
     private List<NinoMostradorCommand>  ninos;
     private String                  nombreAcompanante;
     private String                  dniAcompanante;
+    private String                  tipoDocumentoAcompanante;
     private String                  telefonoAcompanante;
     private Long                    idPromocion;
     private List<PagoMostradorCommand> pagos;

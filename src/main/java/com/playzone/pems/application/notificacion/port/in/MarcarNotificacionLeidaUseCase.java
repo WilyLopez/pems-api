@@ -11,4 +11,6 @@ public interface MarcarNotificacionLeidaUseCase {
     void marcarTodasLeidasUsuario(UUID usuarioId);
 
     void marcarTodasLeidasCliente(Long clienteId);
+
+    void eliminarCliente(Long id, Long clienteId);
 }

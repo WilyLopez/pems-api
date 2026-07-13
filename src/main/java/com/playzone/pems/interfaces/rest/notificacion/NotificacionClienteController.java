@@ -7,6 +7,7 @@ import com.playzone.pems.interfaces.rest.notificacion.mapper.NotificacionRespons
 import com.playzone.pems.interfaces.rest.notificacion.response.ConteoNoLeidasResponse;
 import com.playzone.pems.interfaces.rest.notificacion.response.NotificacionResponse;
 import com.playzone.pems.shared.response.ApiResponse;
+import com.playzone.pems.shared.response.PagedResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -29,7 +30,7 @@ public class NotificacionClienteController {
 
     @GetMapping("/feed")
     @PreAuthorize("@supabaseAuthFacade.tieneRol('CLIENTE')")
-    public ResponseEntity<ApiResponse<Page<NotificacionResponse>>> feed(
+    public ResponseEntity<ApiResponse<PagedResponse<NotificacionResponse>>> feed(
             @RequestParam(defaultValue = "false") boolean soloNoLeidas,
             @RequestParam(defaultValue = "0")     int    page,
             @RequestParam(defaultValue = "20")    int    size) {
@@ -37,9 +38,9 @@ public class NotificacionClienteController {
         Long clienteId = resolverClienteId();
         Page<NotificacionResponse> result = obtenerUseCase
                 .feedCliente(clienteId, soloNoLeidas,
-                        PageRequest.of(page, size, Sort.by("createdAt").descending()))
+                        PageRequest.of(page, size, Sort.by("fechaCreacion").descending()))
                 .map(mapper::toResponse);
-        return ResponseEntity.ok(ApiResponse.ok(result));
+        return ResponseEntity.ok(ApiResponse.ok(PagedResponse.of(result)));
     }
 
     @GetMapping("/count")
@@ -63,6 +64,14 @@ public class NotificacionClienteController {
     public ResponseEntity<ApiResponse<Void>> marcarTodasLeidas() {
         Long clienteId = resolverClienteId();
         marcarUseCase.marcarTodasLeidasCliente(clienteId);
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@supabaseAuthFacade.tieneRol('CLIENTE')")
+    public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
+        Long clienteId = resolverClienteId();
+        marcarUseCase.eliminarCliente(id, clienteId);
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 

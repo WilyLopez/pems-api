@@ -44,9 +44,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -80,6 +83,7 @@ public class ReservaPublicaService
     private final CrearNotificacionPort             crearNotificacionPort;
     private final SedeScopeValidator                sedeScope;
     private final ObjectMapper                       objectMapper;
+    private final com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort resolverAdministradoresPort;
 
     @org.springframework.beans.factory.annotation.Value("${supabase.storage.bucket-comprobantes:comprobantes}")
     private String bucketComprobantes;
@@ -87,7 +91,6 @@ public class ReservaPublicaService
     @org.springframework.beans.factory.annotation.Value("${supabase.storage.bucket-publico:kiki-publico}")
     private String bucketPublico;
 
-    // ── Consultas ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
@@ -95,7 +98,8 @@ public class ReservaPublicaService
         ClientePerfil cliente = clientePerfilRepository.buscarPorId(idCliente)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente", idCliente));
         return reservaRepository.findByCliente(idCliente, pageable)
-                .map(r -> toQuery(r, cliente.nombreCompleto(), cliente.getCorreo(), fetchNombreSede(r.getIdSede()), null, null));
+                .map(r -> toQuery(r, cliente.nombreCompleto(), cliente.getCorreo(), fetchNombreSede(r.getIdSede()),
+                        fetchMedioPago(r.getVentaId()), fetchReferenciaPago(r.getVentaId()), fetchMotivoRechazo(r.getVentaId())));
     }
 
     @Override
@@ -103,7 +107,7 @@ public class ReservaPublicaService
     public Page<ReservaPublicaQuery> consultarPorSedeYFecha(Long idSede, LocalDate fecha, Pageable pageable) {
         String nombreSede = fetchNombreSede(idSede);
         return reservaRepository.findBySedeAndFecha(idSede, fecha, pageable)
-                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null));
+                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null, null));
     }
 
     @Override
@@ -111,7 +115,7 @@ public class ReservaPublicaService
     public Page<ReservaPublicaQuery> consultarPorSedeYEstado(Long idSede, String estado, Pageable pageable) {
         String nombreSede = fetchNombreSede(idSede);
         return reservaRepository.findBySedeAndEstado(idSede, EstadoReservaPublica.valueOf(estado), pageable)
-                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null));
+                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null, null));
     }
 
     @Transactional(readOnly = true)
@@ -128,7 +132,7 @@ public class ReservaPublicaService
         return enriquecerQuery(r);
     }
 
-    // ── Comandos ─────────────────────────────────────────────────────────────────
+
 
     @Override
     @Transactional
@@ -187,13 +191,15 @@ public class ReservaPublicaService
         ReservaPublica guardada = reservaRepository.save(reserva);
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
-                fetchNombreSede(command.getIdSede()), null, null);
+                fetchNombreSede(command.getIdSede()), null, null, null);
         if (cliente.getCorreo() == null) {
             log.warn("Reserva {} sin correo de cliente {}, no se enviará confirmación por correo", guardada.getId(), command.getIdCliente());
         }
 
+        boolean pagaPorYape = "YAPE".equalsIgnoreCase(command.getMedioPago());
+
         crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
-                .tipoCodigo("TICKET_DISPONIBLE")
+                .tipoCodigo(pagaPorYape ? "RESERVA_PENDIENTE_YAPE" : "RESERVA_PENDIENTE_CAJA")
                 .destinatarioClienteId(guardada.getIdCliente())
                 .entidadTipo("reserva_publica")
                 .entidadId(guardada.getId())
@@ -218,7 +224,7 @@ public class ReservaPublicaService
     public ReservaPublicaQuery ejecutar(ReprogramarReservaCommand command) {
         ReservaPublica original = reservaRepository.findByIdForUpdate(command.getIdReservaOriginal())
                 .orElseThrow(() -> new ReservaNotFoundException(command.getIdReservaOriginal()));
-        sedeScope.validarAcceso(original.getIdSede());
+        validarAccesoAOperar(original);
 
         int maxReprogramaciones = configuracionGlobalRepository.findByClave("MAX_REPROGRAMACIONES")
                 .map(c -> { try { return Integer.parseInt(c.getValor()); } catch (NumberFormatException e) { return 1; } })
@@ -251,9 +257,7 @@ public class ReservaPublicaService
         ClientePerfil cliente = clientePerfilRepository.buscarPorId(original.getIdCliente())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente", original.getIdCliente()));
 
-        // Si no se requiere pago adicional, la reserva queda cubierta de inmediato y necesita
-        // una venta propia para habilitar el ingreso. Si se requiere pago adicional, la venta
-        // se crea recien cuando se cobre la diferencia (VentaService.cobrarReserva).
+
         Long ventaIdNueva = null;
         if (!requierePagoAdicional) {
             Venta ventaNueva = ventaRepository.save(Venta.builder()
@@ -301,13 +305,13 @@ public class ReservaPublicaService
         ReservaPublica guardada = reservaRepository.save(nueva);
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
-                fetchNombreSede(guardada.getIdSede()), null, null);
+                fetchNombreSede(guardada.getIdSede()), null, null, null);
         if (cliente.getCorreo() == null) {
             log.warn("Reprogramacion {} sin correo de cliente {}, no se enviará confirmación por correo", guardada.getId(), guardada.getIdCliente());
         }
 
         crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
-                .tipoCodigo(requierePagoAdicional ? "TICKET_DISPONIBLE" : "PAGO_CONFIRMADO")
+                .tipoCodigo(requierePagoAdicional ? "RESERVA_REPROGRAMADA_CON_PAGO" : "RESERVA_REPROGRAMADA")
                 .destinatarioClienteId(guardada.getIdCliente())
                 .entidadTipo("reserva_publica")
                 .entidadId(guardada.getId())
@@ -316,6 +320,9 @@ public class ReservaPublicaService
                         "sede",   query.getNombreSede() != null ? query.getNombreSede() : "",
                         "ticket", guardada.getNumeroTicket() != null ? guardada.getNumeroTicket() : "",
                         "monto",  guardada.getTotalPagado() != null ? guardada.getTotalPagado().toPlainString() : ""))
+                .metadata(serializarMetadataReprogramacion(
+                        original.getFechaEvento() != null ? original.getFechaEvento().toString() : "",
+                        requierePagoAdicional ? diferencia.toPlainString() : null))
                 .build());
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
@@ -335,7 +342,7 @@ public class ReservaPublicaService
     public ReservaPublicaQuery ejecutar(Long idReserva, String motivo) {
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
-        sedeScope.validarAcceso(reserva.getIdSede());
+        validarAccesoAOperar(reserva);
 
         if (!reserva.puedeCancelarse()) {
             throw new ValidationException("La reserva no puede cancelarse en su estado actual.");
@@ -360,7 +367,7 @@ public class ReservaPublicaService
                 null, null, AuditoriaConstants.NIVEL_CRITICAL, AuditoriaConstants.RESULTADO_EXITOSO));
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
-                fetchNombreSede(guardada.getIdSede()), null, null);
+                fetchNombreSede(guardada.getIdSede()), null, null, null);
 
         crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                 .tipoCodigo("RESERVA_CANCELADA")
@@ -419,11 +426,14 @@ public class ReservaPublicaService
             throw new ValidationException("Solo se pueden rechazar pagos de reservas en estado PENDIENTE.");
         }
         
+        String motivoGuardado = motivo != null && !motivo.isBlank() ? motivo : "Comprobante inválido";
+
         var pagosExistentes = ventaPagoRepository.findByVentaId(reserva.getVentaId());
         for (var pago : pagosExistentes) {
             if (!pago.isEsValidado()) {
                 ventaPagoRepository.save(pago.toBuilder()
                         .referencia(null)
+                        .motivoRechazo(motivoGuardado)
                         .build());
             }
         }
@@ -434,7 +444,7 @@ public class ReservaPublicaService
                 .entidadTipo("reserva_publica")
                 .entidadId(reserva.getId())
                 .datosExtra(Map.of(
-                        "motivo", motivo != null ? motivo : "Comprobante invalido",
+                        "motivo", motivoGuardado,
                         "fecha", reserva.getFechaEvento().toString()))
                 .metadata(serializarMetadataMotivo(motivo))
                 .build());
@@ -446,6 +456,19 @@ public class ReservaPublicaService
         try {
             return objectMapper.writeValueAsString(Map.of(
                     "motivo", motivo != null && !motivo.isBlank() ? motivo : "Comprobante inválido"));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return "{}";
+        }
+    }
+
+    private String serializarMetadataReprogramacion(String fechaAnterior, String montoAdicional) {
+        try {
+            var datos = new java.util.HashMap<String, String>();
+            datos.put("fechaAnterior", fechaAnterior != null ? fechaAnterior : "");
+            if (montoAdicional != null) {
+                datos.put("montoAdicional", montoAdicional);
+            }
+            return objectMapper.writeValueAsString(datos);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             return "{}";
         }
@@ -464,7 +487,7 @@ public class ReservaPublicaService
         }
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
-        sedeScope.validarAcceso(reserva.getIdSede());
+        validarAccesoAOperar(reserva);
 
         var pagosExistentes = ventaPagoRepository.findByVentaId(reserva.getVentaId());
         boolean actualizado = false;
@@ -473,6 +496,7 @@ public class ReservaPublicaService
                 ventaPagoRepository.save(pago.toBuilder()
                         .referencia(url)
                         .medioPagoCodigo("YAPE")
+                        .motivoRechazo(null)
                         .build());
                 actualizado = true;
                 break;
@@ -488,10 +512,45 @@ public class ReservaPublicaService
                     .build());
         }
 
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(reserva.getIdCliente())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente", reserva.getIdCliente()));
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("COMPROBANTE_EN_REVISION")
+                .destinatarioClienteId(reserva.getIdCliente())
+                .entidadTipo("reserva_publica")
+                .entidadId(reserva.getId())
+                .datosExtra(Map.of("ticket", reserva.getNumeroTicket() != null ? reserva.getNumeroTicket() : ""))
+                .build());
+
+        for (UUID idAdmin : resolverAdministradoresPort.obtenerIdsAdministradoresActivos()) {
+            crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+                    .tipoCodigo("COMPROBANTE_PARA_REVISAR")
+                    .destinatarioUsuarioId(idAdmin)
+                    .entidadTipo("reserva_publica")
+                    .entidadId(reserva.getId())
+                    .datosExtra(Map.of(
+                            "cliente", cliente.nombreCompleto() != null ? cliente.nombreCompleto() : "",
+                            "ticket", reserva.getNumeroTicket() != null ? reserva.getNumeroTicket() : ""))
+                    .build());
+        }
+
         return enriquecerQuery(reserva);
     }
 
-    // ── Validaciones internas ────────────────────────────────────────────────────
+
+    private void validarAccesoAOperar(ReservaPublica reserva) {
+        if (supabaseAuthFacade.tieneRol("CLIENTE")) {
+            Long propio = supabaseAuthFacade.clientePerfilId()
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.FORBIDDEN, "Cliente sin perfil asociado"));
+            if (!propio.equals(reserva.getIdCliente())) {
+                throw new AccessDeniedException("No puedes operar sobre la reserva de otro cliente.");
+            }
+            return;
+        }
+        sedeScope.validarAcceso(reserva.getIdSede());
+    }
 
     private void validarFechaDisponible(Long idSede, LocalDate fecha) {
         ConfiguracionCalendario cfg = configRepository.obtener(idSede);
@@ -541,7 +600,6 @@ public class ReservaPublicaService
                 .orElse("Sede Principal");
     }
 
-    // ── Mapeo ────────────────────────────────────────────────────────────────────
 
     private ReservaPublicaQuery enriquecerQuery(ReservaPublica r) {
         var cliente = clientePerfilRepository.buscarPorId(r.getIdCliente()).orElse(null);
@@ -550,12 +608,14 @@ public class ReservaPublicaService
                 cliente != null ? cliente.getCorreo() : null,
                 fetchNombreSede(r.getIdSede()),
                 fetchMedioPago(r.getVentaId()),
-                fetchReferenciaPago(r.getVentaId()));
+                fetchReferenciaPago(r.getVentaId()),
+                fetchMotivoRechazo(r.getVentaId()));
     }
 
     private ReservaPublicaQuery toQuery(ReservaPublica r, String nombreCliente,
                                         String correoCliente, String nombreSede,
-                                        String medioPago, String referenciaPago) {
+                                        String medioPago, String referenciaPago,
+                                        String motivoRechazoPago) {
         return ReservaPublicaQuery.builder()
                 .id(r.getId())
                 .idCliente(r.getIdCliente())
@@ -583,6 +643,7 @@ public class ReservaPublicaService
                 .codigoQr(r.getCodigoQr())
                 .medioPago(medioPago)
                 .referenciaPago(referenciaPago)
+                .motivoRechazoPago(motivoRechazoPago)
                 .motivoCancelacion(r.getMotivoCancelacion())
                 .fechaCreacion(r.getCreatedAt())
                 .build();
@@ -601,6 +662,14 @@ public class ReservaPublicaService
         var pagos = ventaPagoRepository.findByVentaId(idVenta);
         if (pagos.isEmpty()) return null;
         if (pagos.size() == 1) return pagos.get(0).getReferencia();
+        return null;
+    }
+
+    private String fetchMotivoRechazo(Long idVenta) {
+        if (idVenta == null) return null;
+        var pagos = ventaPagoRepository.findByVentaId(idVenta);
+        if (pagos.isEmpty()) return null;
+        if (pagos.size() == 1) return pagos.get(0).getMotivoRechazo();
         return null;
     }
 }

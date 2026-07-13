@@ -84,8 +84,11 @@ public class ReservaPublicaEntity {
     @Column(name = "nombre_acompanante", length = 120)
     private String nombreAcompanante;
 
-    @Column(name = "dni_acompanante", length = 8)
+    @Column(name = "dni_acompanante", length = 15)
     private String dniAcompanante;
+
+    @Column(name = "tipo_documento_acompanante", length = 3)
+    private String tipoDocumentoAcompanante;
 
     @Column(name = "firmo_consentimiento", nullable = false)
     private boolean firmoConsentimiento = false;

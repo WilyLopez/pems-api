@@ -50,6 +50,9 @@ public class VentaEntity {
     @Column(name = "dni_acompanante")
     private String dniAcompanante;
 
+    @Column(name = "tipo_documento_acompanante", length = 3)
+    private String tipoDocumentoAcompanante;
+
     @Column(name = "telefono_acompanante")
     private String telefonoAcompanante;
 

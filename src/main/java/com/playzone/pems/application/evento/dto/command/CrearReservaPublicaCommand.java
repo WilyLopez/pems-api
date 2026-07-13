@@ -45,4 +45,6 @@ public class CrearReservaPublicaCommand {
     private final Boolean firmoConsentimiento;
 
     private final Long idPromocionManual;
+
+    private final String medioPago;
 }

@@ -180,7 +180,9 @@ public class ReservaPublicaController {
             @PathVariable Long idSede,
             @Valid @RequestBody CrearReservaRequest request) {
 
-        sedeScope.validarAcceso(idSede);
+        if (!supabaseAuthFacade.tieneRol("CLIENTE")) {
+            sedeScope.validarAcceso(idSede);
+        }
 
         ReservaPublicaQuery query = crearUseCase.ejecutar(
                 CrearReservaPublicaCommand.builder()
@@ -193,6 +195,7 @@ public class ReservaPublicaController {
                         .dniAcompanante(request.getDniAcompanante())
                         .firmoConsentimiento(request.getFirmoConsentimiento())
                         .idPromocionManual(request.getIdPromocionManual())
+                        .medioPago(request.getMedioPago())
                         .build());
 
         if (query.isFirmoConsentimiento()) {
@@ -425,6 +428,7 @@ public class ReservaPublicaController {
                 .codigoQr(q.getCodigoQr())
                 .medioPago(q.getMedioPago())
                 .referenciaPago(q.getReferenciaPago())
+                .motivoRechazoPago(q.getMotivoRechazoPago())
                 .motivoCancelacion(q.getMotivoCancelacion())
                 .fechaCreacion(q.getFechaCreacion())
                 .build();

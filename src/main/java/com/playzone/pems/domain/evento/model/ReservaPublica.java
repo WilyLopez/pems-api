@@ -38,6 +38,7 @@ public class ReservaPublica {
     private int                  edadNino;
     private String               nombreAcompanante;
     private String               dniAcompanante;
+    private String               tipoDocumentoAcompanante;
     private boolean              firmoConsentimiento;
     private String               motivoCancelacion;
     private OffsetDateTime       createdAt;

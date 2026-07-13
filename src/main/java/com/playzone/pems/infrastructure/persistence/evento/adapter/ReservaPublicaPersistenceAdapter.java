@@ -70,6 +70,11 @@ public class ReservaPublicaPersistenceAdapter implements ReservaPublicaRepositor
                 idSede, fecha, EstadoReservaPublica.CONFIRMADA).stream().map(mapper::toDomain).toList();
     }
 
+    @Override public List<ReservaPublica> findPendientesBySedeAndFecha(Long idSede, LocalDate fecha) {
+        return reservaJpa.findBySede_IdAndFechaEventoAndEstado(
+                idSede, fecha, EstadoReservaPublica.PENDIENTE).stream().map(mapper::toDomain).toList();
+    }
+
     @Override public int countConfirmadasBySedeAndFecha(Long idSede, LocalDate fecha) {
         return reservaJpa.countConfirmadasBySedeAndFecha(idSede, fecha);
     }
