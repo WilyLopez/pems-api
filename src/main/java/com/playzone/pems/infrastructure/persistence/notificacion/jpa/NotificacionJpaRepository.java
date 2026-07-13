@@ -93,4 +93,12 @@ public interface NotificacionJpaRepository extends JpaRepository<NotificacionEnt
               AND n.leida = FALSE
             """)
     void marcarTodasLeidasCliente(@Param("clienteId") Long clienteId);
+
+    @Modifying
+    @Query("""
+            DELETE FROM NotificacionEntity n
+            WHERE n.id = :id
+              AND n.destinatarioCliente.id = :clienteId
+            """)
+    void eliminarCliente(@Param("id") Long id, @Param("clienteId") Long clienteId);
 }

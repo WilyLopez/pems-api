@@ -30,6 +30,8 @@ public interface NotificacionRepository {
 
     void marcarTodasLeidasCliente(Long clienteId);
 
+    void eliminarCliente(Long id, Long clienteId);
+
     Notificacion save(Notificacion notificacion);
 
     List<Notificacion> saveAll(List<Notificacion> notificaciones);

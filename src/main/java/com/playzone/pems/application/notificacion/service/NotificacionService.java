@@ -116,6 +116,12 @@ public class NotificacionService
     }
 
     @Override
+    @Transactional
+    public void eliminarCliente(Long id, Long clienteId) {
+        notifRepo.eliminarCliente(id, clienteId);
+    }
+
+    @Override
     public EstadoEntregaQuery consultarPorEntidad(String entidadTipo, Long entidadId) {
         return notifRepo.findUltimaPorEntidad(entidadTipo, entidadId)
                 .map(this::estadoEntregaDeNotificacion)

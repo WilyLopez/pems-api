@@ -180,7 +180,9 @@ public class ReservaPublicaController {
             @PathVariable Long idSede,
             @Valid @RequestBody CrearReservaRequest request) {
 
-        sedeScope.validarAcceso(idSede);
+        if (!supabaseAuthFacade.tieneRol("CLIENTE")) {
+            sedeScope.validarAcceso(idSede);
+        }
 
         ReservaPublicaQuery query = crearUseCase.ejecutar(
                 CrearReservaPublicaCommand.builder()

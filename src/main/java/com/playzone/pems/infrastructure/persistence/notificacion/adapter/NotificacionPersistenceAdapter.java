@@ -91,6 +91,12 @@ public class NotificacionPersistenceAdapter implements NotificacionRepository, T
 
     @Override
     @Transactional
+    public void eliminarCliente(Long id, Long clienteId) {
+        jpa.eliminarCliente(id, clienteId);
+    }
+
+    @Override
+    @Transactional
     public Notificacion save(Notificacion notificacion) {
         return mapper.toDomain(jpa.save(buildEntity(notificacion)));
     }

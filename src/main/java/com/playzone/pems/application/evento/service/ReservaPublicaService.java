@@ -44,9 +44,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -87,7 +90,6 @@ public class ReservaPublicaService
     @org.springframework.beans.factory.annotation.Value("${supabase.storage.bucket-publico:kiki-publico}")
     private String bucketPublico;
 
-    // ── Consultas ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
@@ -128,7 +130,7 @@ public class ReservaPublicaService
         return enriquecerQuery(r);
     }
 
-    // ── Comandos ─────────────────────────────────────────────────────────────────
+
 
     @Override
     @Transactional
@@ -218,7 +220,7 @@ public class ReservaPublicaService
     public ReservaPublicaQuery ejecutar(ReprogramarReservaCommand command) {
         ReservaPublica original = reservaRepository.findByIdForUpdate(command.getIdReservaOriginal())
                 .orElseThrow(() -> new ReservaNotFoundException(command.getIdReservaOriginal()));
-        sedeScope.validarAcceso(original.getIdSede());
+        validarAccesoAOperar(original);
 
         int maxReprogramaciones = configuracionGlobalRepository.findByClave("MAX_REPROGRAMACIONES")
                 .map(c -> { try { return Integer.parseInt(c.getValor()); } catch (NumberFormatException e) { return 1; } })
@@ -251,9 +253,7 @@ public class ReservaPublicaService
         ClientePerfil cliente = clientePerfilRepository.buscarPorId(original.getIdCliente())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente", original.getIdCliente()));
 
-        // Si no se requiere pago adicional, la reserva queda cubierta de inmediato y necesita
-        // una venta propia para habilitar el ingreso. Si se requiere pago adicional, la venta
-        // se crea recien cuando se cobre la diferencia (VentaService.cobrarReserva).
+
         Long ventaIdNueva = null;
         if (!requierePagoAdicional) {
             Venta ventaNueva = ventaRepository.save(Venta.builder()
@@ -335,7 +335,7 @@ public class ReservaPublicaService
     public ReservaPublicaQuery ejecutar(Long idReserva, String motivo) {
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
-        sedeScope.validarAcceso(reserva.getIdSede());
+        validarAccesoAOperar(reserva);
 
         if (!reserva.puedeCancelarse()) {
             throw new ValidationException("La reserva no puede cancelarse en su estado actual.");
@@ -464,7 +464,7 @@ public class ReservaPublicaService
         }
         ReservaPublica reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
-        sedeScope.validarAcceso(reserva.getIdSede());
+        validarAccesoAOperar(reserva);
 
         var pagosExistentes = ventaPagoRepository.findByVentaId(reserva.getVentaId());
         boolean actualizado = false;
@@ -491,7 +491,19 @@ public class ReservaPublicaService
         return enriquecerQuery(reserva);
     }
 
-    // ── Validaciones internas ────────────────────────────────────────────────────
+
+    private void validarAccesoAOperar(ReservaPublica reserva) {
+        if (supabaseAuthFacade.tieneRol("CLIENTE")) {
+            Long propio = supabaseAuthFacade.clientePerfilId()
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.FORBIDDEN, "Cliente sin perfil asociado"));
+            if (!propio.equals(reserva.getIdCliente())) {
+                throw new AccessDeniedException("No puedes operar sobre la reserva de otro cliente.");
+            }
+            return;
+        }
+        sedeScope.validarAcceso(reserva.getIdSede());
+    }
 
     private void validarFechaDisponible(Long idSede, LocalDate fecha) {
         ConfiguracionCalendario cfg = configRepository.obtener(idSede);
@@ -541,7 +553,6 @@ public class ReservaPublicaService
                 .orElse("Sede Principal");
     }
 
-    // ── Mapeo ────────────────────────────────────────────────────────────────────
 
     private ReservaPublicaQuery enriquecerQuery(ReservaPublica r) {
         var cliente = clientePerfilRepository.buscarPorId(r.getIdCliente()).orElse(null);
