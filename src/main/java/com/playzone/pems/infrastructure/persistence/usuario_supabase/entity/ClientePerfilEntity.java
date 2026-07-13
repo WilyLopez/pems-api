@@ -38,7 +38,7 @@ public class ClientePerfilEntity {
     private String tipoDocumentoCodigo;
 
     @Setter
-    @Column(name = "numero_documento", nullable = false)
+    @Column(name = "numero_documento")
     private String numeroDocumento;
 
     @Setter
