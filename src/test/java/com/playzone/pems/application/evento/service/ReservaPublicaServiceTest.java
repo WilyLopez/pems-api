@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
 import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
+import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
 import com.playzone.pems.domain.calendario.repository.BloqueCalendarioRepository;
 import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.domain.calendario.repository.FeriadoRepository;
@@ -56,6 +57,7 @@ class ReservaPublicaServiceTest {
     @Mock private RegistrarLogUseCase auditoria;
     @Mock private CrearNotificacionPort crearNotificacionPort;
     @Mock private SedeScopeValidator sedeScope;
+    @Mock private ResolverAdministradoresPort resolverAdministradoresPort;
 
     private ReservaPublicaService service;
 
@@ -66,7 +68,7 @@ class ReservaPublicaServiceTest {
                 tarifaRepository, feriadoRepository, bloqueRepository, configRepository,
                 storagePort, ventaRepository, ventaPagoRepository, supabaseAuthFacade,
                 configuracionGlobalRepository, auditoria, crearNotificacionPort, sedeScope,
-                new ObjectMapper());
+                new ObjectMapper(), resolverAdministradoresPort);
     }
 
     private ReservaPublica reservaPendiente() {

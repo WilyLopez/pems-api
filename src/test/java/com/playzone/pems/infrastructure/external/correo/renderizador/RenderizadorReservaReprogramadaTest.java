@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.evento.dto.query.ReservaPublicaQuery;
 import com.playzone.pems.application.evento.port.in.ConsultarReservasUseCase;
 import com.playzone.pems.domain.notificacion.model.Notificacion;
+import com.playzone.pems.domain.usuario.repository.SedeRepository;
+import com.playzone.pems.infrastructure.pdf.TicketIngresoPdfService;
 import com.playzone.pems.infrastructure.template.TemplateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,13 +22,16 @@ import static org.mockito.Mockito.when;
 class RenderizadorReservaReprogramadaTest {
 
     @Mock private ConsultarReservasUseCase consultarReservasUseCase;
+    @Mock private SedeRepository sedeRepository;
+    @Mock private TicketIngresoPdfService ticketIngresoPdfService;
 
     private RenderizadorReservaReprogramada renderizador;
 
     @BeforeEach
     void setUp() {
         renderizador = new RenderizadorReservaReprogramada(
-                consultarReservasUseCase, new TemplateService(), new ObjectMapper());
+                consultarReservasUseCase, sedeRepository, ticketIngresoPdfService,
+                new TemplateService(), new ObjectMapper());
     }
 
     @Test
