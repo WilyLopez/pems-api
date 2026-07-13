@@ -63,9 +63,7 @@ public class ReservaPublica {
     }
 
     public boolean puedeRegistrarIngreso() {
-        return !ingresado
-                && (estado == EstadoReservaPublica.CONFIRMADA
-                    || estado == EstadoReservaPublica.PENDIENTE);
+        return !ingresado && estado == EstadoReservaPublica.CONFIRMADA;
     }
 
     public boolean requiresVentaForEntry() {

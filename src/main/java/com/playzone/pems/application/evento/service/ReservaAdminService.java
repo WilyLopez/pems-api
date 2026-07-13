@@ -62,13 +62,13 @@ public class ReservaAdminService
     @Override
     @Transactional
     public ReservaPublicaQuery ejecutar(Long idReserva, UUID idUsuarioAdmin) {
-        ReservaPublica reserva = reservaRepository.findById(idReserva)
+        ReservaPublica reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
         sedeScope.validarAcceso(reserva.getIdSede());
 
-        if (reserva.getFechaEvento().isBefore(LocalDate.now(ZoneId.of("America/Lima")))) {
+        if (!reserva.getFechaEvento().isEqual(FechaUtil.hoy())) {
             throw new ValidationException(
-                    "No se puede registrar el ingreso de una reserva cuya fecha ya pasó.");
+                    "Solo se puede registrar el ingreso el mismo día de la reserva.");
         }
 
         if (!reserva.puedeRegistrarIngreso()) {
@@ -156,13 +156,13 @@ public class ReservaAdminService
 
     @Transactional
     public TicketDetalleQuery marcarEntrada(Long idReserva) {
-        ReservaPublica r = reservaRepository.findById(idReserva)
+        ReservaPublica r = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
         sedeScope.validarAcceso(r.getIdSede());
 
-        if (r.getFechaEvento().isBefore(LocalDate.now(ZoneId.of("America/Lima")))) {
+        if (!r.getFechaEvento().isEqual(FechaUtil.hoy())) {
             throw new ValidationException(
-                    "No se puede registrar el ingreso de una reserva cuya fecha ya pasó.");
+                    "Este ticket es para el " + r.getFechaEvento() + ", no para hoy. Cambia la fecha antes de ingresar.");
         }
 
         if (r.isIngresado()) {
@@ -170,6 +170,9 @@ public class ReservaAdminService
         }
         if (r.getEstado() == EstadoReservaPublica.CANCELADA) {
             throw new ValidationException("Este ticket esta cancelado.");
+        }
+        if (r.getEstado() == EstadoReservaPublica.REPROGRAMADA) {
+            throw new ValidationException("Este ticket fue reprogramado a otra fecha y ya no es válido.");
         }
         if (r.getEstado() == EstadoReservaPublica.PENDIENTE) {
             throw new ValidationException("Este ticket tiene pago pendiente. Cobra antes de permitir el ingreso.");
@@ -200,7 +203,7 @@ public class ReservaAdminService
 
     @Transactional
     public TicketDetalleQuery editarFecha(Long idReserva, LocalDate nuevaFecha) {
-        ReservaPublica r = reservaRepository.findById(idReserva)
+        ReservaPublica r = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new ReservaNotFoundException(idReserva));
         sedeScope.validarAcceso(r.getIdSede());
 
@@ -209,6 +212,9 @@ public class ReservaAdminService
         }
         if (r.getEstado() == EstadoReservaPublica.CANCELADA) {
             throw new ValidationException("No se puede cambiar la fecha de un ticket cancelado.");
+        }
+        if (r.getEstado() == EstadoReservaPublica.REPROGRAMADA) {
+            throw new ValidationException("Este ticket fue reprogramado a otra fecha y ya no es válido.");
         }
 
         LocalDate hoy = FechaUtil.hoy();

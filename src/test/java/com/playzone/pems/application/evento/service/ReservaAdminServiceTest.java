@@ -18,6 +18,7 @@ import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
 import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
+import com.playzone.pems.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -73,8 +74,8 @@ class ReservaAdminServiceTest {
 
     @Test
     void testConfirmarIngresoNotificaInAppAlCliente() {
-        ReservaPublica reserva = reservaConfirmada();
-        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        ReservaPublica reserva = reservaConfirmada().toBuilder().fechaEvento(LocalDate.now()).build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
         when(reservaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.ejecutar(1L, UUID.randomUUID());
@@ -87,9 +88,30 @@ class ReservaAdminServiceTest {
     }
 
     @Test
+    void testConfirmarIngresoRechazaReservaPendiente() {
+        ReservaPublica reserva = reservaConfirmada().toBuilder()
+                .fechaEvento(LocalDate.now())
+                .estado(EstadoReservaPublica.PENDIENTE)
+                .build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
+
+        assertThrows(ValidationException.class, () -> service.ejecutar(1L, UUID.randomUUID()));
+        verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
+    void testConfirmarIngresoRechazaFechaFutura() {
+        ReservaPublica reserva = reservaConfirmada().toBuilder().fechaEvento(LocalDate.now().plusDays(2)).build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
+
+        assertThrows(ValidationException.class, () -> service.ejecutar(1L, UUID.randomUUID()));
+        verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
     void testMarcarEntradaRegistraAuditoriaYNotifica() {
-        ReservaPublica reserva = reservaConfirmada();
-        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        ReservaPublica reserva = reservaConfirmada().toBuilder().fechaEvento(LocalDate.now()).build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
         when(reservaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.marcarEntrada(1L);
@@ -102,9 +124,41 @@ class ReservaAdminServiceTest {
     }
 
     @Test
+    void testMarcarEntradaRechazaTicketDeFechaFutura() {
+        ReservaPublica reserva = reservaConfirmada().toBuilder().fechaEvento(LocalDate.now().plusDays(3)).build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
+
+        assertThrows(ValidationException.class, () -> service.marcarEntrada(1L));
+        verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
+    void testMarcarEntradaRechazaTicketReprogramado() {
+        ReservaPublica reserva = reservaConfirmada().toBuilder()
+                .fechaEvento(LocalDate.now())
+                .estado(EstadoReservaPublica.REPROGRAMADA)
+                .build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
+
+        assertThrows(ValidationException.class, () -> service.marcarEntrada(1L));
+        verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
+    void testEditarFechaRechazaTicketReprogramado() {
+        ReservaPublica reserva = reservaConfirmada().toBuilder()
+                .estado(EstadoReservaPublica.REPROGRAMADA)
+                .build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
+
+        assertThrows(ValidationException.class, () -> service.editarFecha(1L, LocalDate.now().plusDays(10)));
+        verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
     void testEditarFechaNotificaTransaccionalReservaReprogramada() {
         ReservaPublica reserva = reservaConfirmada();
-        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
         when(reservaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
                 .diasMaxReservaPublica(90).aforoMaximo(100).build());

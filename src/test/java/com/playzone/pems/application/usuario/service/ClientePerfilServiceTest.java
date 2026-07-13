@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
 import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.application.usuario.dto.command.ActualizarClientePerfilCommand;
+import com.playzone.pems.application.usuario.dto.command.CompletarPerfilClienteCommand;
 import com.playzone.pems.application.usuario.dto.command.RegistrarClientePublicoCommand;
 import com.playzone.pems.application.usuario.port.out.SupabaseAuthPort;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
@@ -115,6 +116,30 @@ class ClientePerfilServiceTest {
     }
 
     @Test
+    void registrarNuevoClienteSinDocumentoNiTelefonoNoValidaDuplicadoYNormalizaNombre() {
+        RegistrarClientePublicoCommand sinDatos = RegistrarClientePublicoCommand.builder()
+                .nombre("juan perez")
+                .correo("juan2@gmail.com")
+                .password("123456")
+                .telefono("")
+                .tipoDocumentoCodigo("DNI")
+                .numeroDocumento("")
+                .build();
+
+        UUID usuarioId = UUID.randomUUID();
+        when(clientePerfilRepository.buscarPorCorreo(anyString())).thenReturn(Optional.empty());
+        when(supabaseAuthPort.crearUsuario(anyString(), anyString(), anyString(), anyBoolean())).thenReturn(usuarioId);
+        when(clientePerfilRepository.guardar(any(ClientePerfil.class))).thenAnswer(i -> i.getArgument(0));
+
+        ClientePerfil resultado = clientePerfilService.ejecutar(sinDatos);
+
+        assertNull(resultado.getNumeroDocumento());
+        assertNull(resultado.getTelefono());
+        assertEquals("JUAN PEREZ", resultado.getNombres());
+        verify(clientePerfilRepository, never()).buscarPorDocumento(anyString(), anyString());
+    }
+
+    @Test
     void fallarSiDocumentoDuplicado() {
         when(clientePerfilRepository.buscarPorCorreo(anyString())).thenReturn(Optional.empty());
         when(clientePerfilRepository.buscarPorDocumento(anyString(), anyString()))
@@ -131,6 +156,32 @@ class ClientePerfilServiceTest {
                 .thenThrow(new RuntimeException("Supabase Error"));
 
         assertThrows(RuntimeException.class, () -> clientePerfilService.ejecutar(command));
+    }
+
+    @Test
+    void completarPerfilSinDocumentoCreaClienteNuevoConNombreEnMayusculas() {
+        UUID usuarioId = UUID.randomUUID();
+        CompletarPerfilClienteCommand comando = CompletarPerfilClienteCommand.builder()
+                .usuarioId(usuarioId)
+                .correo("nuevo.perfil@correo.com")
+                .nombres("maria lopez")
+                .tipoDocumentoCodigo("DNI")
+                .numeroDocumento("")
+                .telefono("")
+                .aceptaComunicaciones(true)
+                .build();
+
+        when(clientePerfilRepository.buscarPorUsuarioId(usuarioId)).thenReturn(Optional.empty());
+        when(clientePerfilRepository.buscarPorCorreo(comando.getCorreo())).thenReturn(Optional.empty());
+        when(perfilUsuarioRepository.buscarPorId(usuarioId)).thenReturn(Optional.empty());
+        when(clientePerfilRepository.guardar(any(ClientePerfil.class))).thenAnswer(i -> i.getArgument(0));
+
+        ClientePerfil resultado = clientePerfilService.ejecutar(comando);
+
+        assertEquals("MARIA LOPEZ", resultado.getNombres());
+        assertNull(resultado.getNumeroDocumento());
+        assertNull(resultado.getTelefono());
+        verify(clientePerfilRepository, never()).buscarPorDocumento(anyString(), anyString());
     }
 
     private ClientePerfil clienteConCorreo(String correo) {

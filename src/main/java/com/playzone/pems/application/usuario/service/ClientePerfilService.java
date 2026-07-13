@@ -78,9 +78,10 @@ public class ClientePerfilService
         if (command.getTipoDocumentoCodigo() == null || command.getTipoDocumentoCodigo().isBlank()) {
             throw new ValidationException("tipoDocumento", "El tipo de documento es obligatorio.");
         }
-        if (command.getNumeroDocumento() == null || command.getNumeroDocumento().isBlank()) {
-            throw new ValidationException("numeroDocumento", "El número de documento es obligatorio.");
-        }
+
+        String nombreNormalizado = normalizarNombre(command.getNombre());
+        String numeroDocumento = normalizarOpcional(command.getNumeroDocumento());
+        String telefono = normalizarOpcional(command.getTelefono());
 
         // 2. Validar si ya existe un cliente con ese correo
         Optional<ClientePerfil> clienteExistente = clientePerfilRepository.buscarPorCorreo(command.getCorreo());
@@ -90,7 +91,7 @@ public class ClientePerfilService
             if (cliente.getUsuarioId() != null) {
                 throw new ValidationException("correo", "El correo ya está registrado y vinculado a una cuenta.");
             }
-            
+
             // Caso POS: El cliente existe pero no tiene usuarioId
             // 2. Crear usuario en Supabase
             UUID usuarioId = supabaseAuthPort.crearUsuario(command.getCorreo(), command.getPassword(), command.getNombre(), false);
@@ -102,7 +103,7 @@ public class ClientePerfilService
             // 3. Vincular usuarioId al cliente existente
             ClientePerfil vinculado = cliente.toBuilder()
                     .usuarioId(usuarioId)
-                    .nombres(command.getNombre()) // Actualizamos el nombre con el del registro web si es necesario
+                    .nombres(nombreNormalizado) // Actualizamos el nombre con el del registro web si es necesario
                     .origen("WEB")
                     .fotoPerfilPath(fotoGoogle)
                     .build();
@@ -111,12 +112,14 @@ public class ClientePerfilService
         }
 
         // Caso Nuevo: No existe el cliente por correo
-        // 2. Validar duplicado por documento
-        clientePerfilRepository.buscarPorDocumento(
-                command.getTipoDocumentoCodigo(), command.getNumeroDocumento()
-        ).ifPresent(c -> {
-            throw new ValidationException("numeroDocumento", "Ya existe una cuenta con ese documento.");
-        });
+        // 2. Validar duplicado por documento (solo si se proporcionó uno)
+        if (numeroDocumento != null) {
+            clientePerfilRepository.buscarPorDocumento(
+                    command.getTipoDocumentoCodigo(), numeroDocumento
+            ).ifPresent(c -> {
+                throw new ValidationException("numeroDocumento", "Ya existe una cuenta con ese documento.");
+            });
+        }
 
         // 3. Crear usuario en Supabase
         UUID usuarioId = supabaseAuthPort.crearUsuario(command.getCorreo(), command.getPassword(), command.getNombre(), false);
@@ -129,10 +132,10 @@ public class ClientePerfilService
         ClientePerfil nuevo = ClientePerfil.builder()
                 .usuarioId(usuarioId)
                 .tipoDocumentoCodigo(command.getTipoDocumentoCodigo())
-                .numeroDocumento(command.getNumeroDocumento())
-                .nombres(command.getNombre())
+                .numeroDocumento(numeroDocumento)
+                .nombres(nombreNormalizado)
                 .correo(command.getCorreo())
-                .telefono(command.getTelefono())
+                .telefono(telefono)
                 .origen("WEB")
                 .aceptaComunicaciones(true)
                 .segmentoCodigo("NUEVO")
@@ -143,6 +146,14 @@ public class ClientePerfilService
                 .build();
 
         return clientePerfilRepository.guardar(nuevo);
+    }
+
+    private String normalizarNombre(String nombre) {
+        return nombre == null ? null : nombre.trim().toUpperCase();
+    }
+
+    private String normalizarOpcional(String valor) {
+        return (valor == null || valor.isBlank()) ? null : valor.trim();
     }
 
     @Override
@@ -206,9 +217,10 @@ public class ClientePerfilService
         if (command.getUsuarioId() == null) {
             throw new ValidationException("usuarioId", "No autenticado.");
         }
-        if (command.getNumeroDocumento() == null || command.getNumeroDocumento().isBlank()) {
-            throw new ValidationException("numeroDocumento", "El número de documento es obligatorio.");
-        }
+
+        String nombreNormalizado = normalizarNombre(command.getNombres());
+        String numeroDocumento = normalizarOpcional(command.getNumeroDocumento());
+        String telefono = normalizarOpcional(command.getTelefono());
 
         clientePerfilRepository.buscarPorUsuarioId(command.getUsuarioId()).ifPresent(c -> {
             throw new ValidationException("usuarioId", "Ya tienes un perfil registrado.");
@@ -227,21 +239,23 @@ public class ClientePerfilService
             if (existente.getUsuarioId() != null) {
                 throw new ValidationException("correo", "Ese correo ya está vinculado a otra cuenta.");
             }
-            clientePerfilRepository.buscarPorDocumento(
-                            command.getTipoDocumentoCodigo(), command.getNumeroDocumento())
-                    .filter(d -> !d.getId().equals(existente.getId()))
-                    .ifPresent(d -> {
-                        throw new ValidationException("numeroDocumento", "Ya existe una cuenta con ese documento.");
-                    });
+            if (numeroDocumento != null) {
+                clientePerfilRepository.buscarPorDocumento(
+                                command.getTipoDocumentoCodigo(), numeroDocumento)
+                        .filter(d -> !d.getId().equals(existente.getId()))
+                        .ifPresent(d -> {
+                            throw new ValidationException("numeroDocumento", "Ya existe una cuenta con ese documento.");
+                        });
+            }
 
             ClientePerfil vinculado = existente.toBuilder()
                     .usuarioId(command.getUsuarioId())
                     .tipoDocumentoCodigo(command.getTipoDocumentoCodigo())
-                    .numeroDocumento(command.getNumeroDocumento())
-                    .nombres(command.getNombres())
+                    .numeroDocumento(numeroDocumento)
+                    .nombres(nombreNormalizado)
                     .apellidoPaterno(command.getApellidoPaterno())
                     .apellidoMaterno(command.getApellidoMaterno())
-                    .telefono(command.getTelefono())
+                    .telefono(telefono)
                     .origen("WEB")
                     .aceptaComunicaciones(command.isAceptaComunicaciones())
                     .fotoPerfilPath(fotoGoogle)
@@ -249,21 +263,23 @@ public class ClientePerfilService
             return clientePerfilRepository.guardar(vinculado);
         }
 
-        clientePerfilRepository.buscarPorDocumento(
-                command.getTipoDocumentoCodigo(), command.getNumeroDocumento()
-        ).ifPresent(c -> {
-            throw new ValidationException("numeroDocumento", "Ya existe una cuenta con ese documento.");
-        });
+        if (numeroDocumento != null) {
+            clientePerfilRepository.buscarPorDocumento(
+                    command.getTipoDocumentoCodigo(), numeroDocumento
+            ).ifPresent(c -> {
+                throw new ValidationException("numeroDocumento", "Ya existe una cuenta con ese documento.");
+            });
+        }
 
         ClientePerfil nuevo = ClientePerfil.builder()
                 .usuarioId(command.getUsuarioId())
                 .tipoDocumentoCodigo(command.getTipoDocumentoCodigo())
-                .numeroDocumento(command.getNumeroDocumento())
-                .nombres(command.getNombres())
+                .numeroDocumento(numeroDocumento)
+                .nombres(nombreNormalizado)
                 .apellidoPaterno(command.getApellidoPaterno())
                 .apellidoMaterno(command.getApellidoMaterno())
                 .correo(command.getCorreo())
-                .telefono(command.getTelefono())
+                .telefono(telefono)
                 .origen("WEB")
                 .aceptaComunicaciones(command.isAceptaComunicaciones())
                 .segmentoCodigo("NUEVO")
