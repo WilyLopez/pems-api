@@ -158,4 +158,17 @@ public interface ReservaPublicaJpaRepository extends JpaRepository<ReservaPublic
             @Param("fin")    LocalDate fin);
 
     List<ReservaPublicaEntity> findByVentaId(Long ventaId);
+
+    @Query("""
+            SELECT COUNT(r) FROM ReservaPublicaEntity r
+            WHERE r.clienteId = :idCliente
+              AND r.fechaEvento = :fecha
+              AND r.estado = 'PENDIENTE'
+              AND NOT EXISTS (
+                    SELECT 1 FROM VentaPagoEntity vp
+                    WHERE vp.ventaId = r.ventaId AND vp.referencia IS NOT NULL
+              )
+            """)
+    int countPendientesSinComprobantePorClienteYFecha(
+            @Param("idCliente") Long idCliente, @Param("fecha") LocalDate fecha);
 }

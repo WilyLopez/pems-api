@@ -191,6 +191,11 @@ public class ReservaPublicaPersistenceAdapter implements ReservaPublicaRepositor
     }
 
     @Override
+    public int countPendientesSinComprobantePorClienteYFecha(Long idCliente, LocalDate fecha) {
+        return reservaJpa.countPendientesSinComprobantePorClienteYFecha(idCliente, fecha);
+    }
+
+    @Override
     @Transactional
     public void deleteById(Long id) {
         reservaJpa.deleteById(id);
