@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tu reserva cambió de fecha - Kiki y Lala</title>
+</head>
+<body style="margin:0;padding:0;background-color:#fafafa;font-family:Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;padding:24px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);max-width:520px;width:100%;">
+                <tr>
+                    <td style="background:#F64B8A;padding:20px;text-align:center;">
+                        <h2 style="color:#ffffff;margin:0;font-size:18px;font-weight:700;">Tu reserva cambió de fecha</h2>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:24px;color:#334155;font-size:14px;line-height:1.6;">
+                        <p style="margin-top:0;">Hola <b>{{nombreCliente}}</b>,</p>
+                        <p>Tu reserva <b>{{ticket}}</b> fue reprogramada.</p>
+
+                        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;font-size:13px;">
+                            <p style="margin:6px 0;"><span style="color:#64748b;">Fecha anterior:</span> <s>{{fechaAnterior}}</s></p>
+                            <p style="margin:6px 0;"><span style="color:#64748b;">Nueva fecha:</span> <b>{{fechaNueva}}</b></p>
+                        </div>
+
+                        <p style="color:#92400e;background:#fffbeb;border:1px solid #fef3c7;border-radius:6px;padding:12px;font-size:13px;line-height:1.4;margin:16px 0;">
+                            <strong>Importante:</strong> la nueva fecha tiene una tarifa distinta a la que ya pagaste, asi que falta un pago adicional de <b>S/ {{montoAdicional}}</b> para confirmar tu reserva.
+                        </p>
+
+                        <div style="text-align:center;margin:24px 0;">
+                            <a href="{{urlReserva}}" style="background-color:#F64B8A;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:700;display:inline-block;">Completar pago</a>
+                        </div>
+
+                        <p style="color:#64748b;font-size:13px;">Puedes pagar en caja al llegar o subir tu comprobante Yape desde tu portal.</p>
+
+                        <p style="color:#64748b;font-size:12px;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px;text-align:center;">
+                            Kiki y Lala - Chiclayo, Peru
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

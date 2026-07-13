@@ -34,4 +34,6 @@ public class CrearReservaRequest {
     private Boolean firmoConsentimiento;
 
     private Long idPromocionManual;
+
+    private String medioPago;
 }

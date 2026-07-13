@@ -83,6 +83,7 @@ public class ReservaPublicaService
     private final CrearNotificacionPort             crearNotificacionPort;
     private final SedeScopeValidator                sedeScope;
     private final ObjectMapper                       objectMapper;
+    private final com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort resolverAdministradoresPort;
 
     @org.springframework.beans.factory.annotation.Value("${supabase.storage.bucket-comprobantes:comprobantes}")
     private String bucketComprobantes;
@@ -195,8 +196,10 @@ public class ReservaPublicaService
             log.warn("Reserva {} sin correo de cliente {}, no se enviará confirmación por correo", guardada.getId(), command.getIdCliente());
         }
 
+        boolean pagaPorYape = "YAPE".equalsIgnoreCase(command.getMedioPago());
+
         crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
-                .tipoCodigo("TICKET_DISPONIBLE")
+                .tipoCodigo(pagaPorYape ? "RESERVA_PENDIENTE_YAPE" : "RESERVA_PENDIENTE_CAJA")
                 .destinatarioClienteId(guardada.getIdCliente())
                 .entidadTipo("reserva_publica")
                 .entidadId(guardada.getId())
@@ -308,7 +311,7 @@ public class ReservaPublicaService
         }
 
         crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
-                .tipoCodigo(requierePagoAdicional ? "TICKET_DISPONIBLE" : "PAGO_CONFIRMADO")
+                .tipoCodigo(requierePagoAdicional ? "RESERVA_REPROGRAMADA_CON_PAGO" : "RESERVA_REPROGRAMADA")
                 .destinatarioClienteId(guardada.getIdCliente())
                 .entidadTipo("reserva_publica")
                 .entidadId(guardada.getId())
@@ -317,6 +320,9 @@ public class ReservaPublicaService
                         "sede",   query.getNombreSede() != null ? query.getNombreSede() : "",
                         "ticket", guardada.getNumeroTicket() != null ? guardada.getNumeroTicket() : "",
                         "monto",  guardada.getTotalPagado() != null ? guardada.getTotalPagado().toPlainString() : ""))
+                .metadata(serializarMetadataReprogramacion(
+                        original.getFechaEvento() != null ? original.getFechaEvento().toString() : "",
+                        requierePagoAdicional ? diferencia.toPlainString() : null))
                 .build());
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
@@ -455,6 +461,19 @@ public class ReservaPublicaService
         }
     }
 
+    private String serializarMetadataReprogramacion(String fechaAnterior, String montoAdicional) {
+        try {
+            var datos = new java.util.HashMap<String, String>();
+            datos.put("fechaAnterior", fechaAnterior != null ? fechaAnterior : "");
+            if (montoAdicional != null) {
+                datos.put("montoAdicional", montoAdicional);
+            }
+            return objectMapper.writeValueAsString(datos);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return "{}";
+        }
+    }
+
     @Transactional
     public ReservaPublicaQuery actualizarReferenciaPago(Long idReserva, MultipartFile archivo) {
         String url;
@@ -490,6 +509,29 @@ public class ReservaPublicaService
                     .monto(reserva.getTotalPagado())
                     .referencia(url)
                     .esValidado(false)
+                    .build());
+        }
+
+        ClientePerfil cliente = clientePerfilRepository.buscarPorId(reserva.getIdCliente())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente", reserva.getIdCliente()));
+
+        crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                .tipoCodigo("COMPROBANTE_EN_REVISION")
+                .destinatarioClienteId(reserva.getIdCliente())
+                .entidadTipo("reserva_publica")
+                .entidadId(reserva.getId())
+                .datosExtra(Map.of("ticket", reserva.getNumeroTicket() != null ? reserva.getNumeroTicket() : ""))
+                .build());
+
+        for (UUID idAdmin : resolverAdministradoresPort.obtenerIdsAdministradoresActivos()) {
+            crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+                    .tipoCodigo("COMPROBANTE_PARA_REVISAR")
+                    .destinatarioUsuarioId(idAdmin)
+                    .entidadTipo("reserva_publica")
+                    .entidadId(reserva.getId())
+                    .datosExtra(Map.of(
+                            "cliente", cliente.nombreCompleto() != null ? cliente.nombreCompleto() : "",
+                            "ticket", reserva.getNumeroTicket() != null ? reserva.getNumeroTicket() : ""))
                     .build());
         }
 

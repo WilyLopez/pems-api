@@ -195,6 +195,7 @@ public class ReservaPublicaController {
                         .dniAcompanante(request.getDniAcompanante())
                         .firmoConsentimiento(request.getFirmoConsentimiento())
                         .idPromocionManual(request.getIdPromocionManual())
+                        .medioPago(request.getMedioPago())
                         .build());
 
         if (query.isFirmoConsentimiento()) {
