@@ -97,7 +97,8 @@ public class ReservaPublicaService
         ClientePerfil cliente = clientePerfilRepository.buscarPorId(idCliente)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente", idCliente));
         return reservaRepository.findByCliente(idCliente, pageable)
-                .map(r -> toQuery(r, cliente.nombreCompleto(), cliente.getCorreo(), fetchNombreSede(r.getIdSede()), null, null));
+                .map(r -> toQuery(r, cliente.nombreCompleto(), cliente.getCorreo(), fetchNombreSede(r.getIdSede()),
+                        fetchMedioPago(r.getVentaId()), fetchReferenciaPago(r.getVentaId()), fetchMotivoRechazo(r.getVentaId())));
     }
 
     @Override
@@ -105,7 +106,7 @@ public class ReservaPublicaService
     public Page<ReservaPublicaQuery> consultarPorSedeYFecha(Long idSede, LocalDate fecha, Pageable pageable) {
         String nombreSede = fetchNombreSede(idSede);
         return reservaRepository.findBySedeAndFecha(idSede, fecha, pageable)
-                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null));
+                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null, null));
     }
 
     @Override
@@ -113,7 +114,7 @@ public class ReservaPublicaService
     public Page<ReservaPublicaQuery> consultarPorSedeYEstado(Long idSede, String estado, Pageable pageable) {
         String nombreSede = fetchNombreSede(idSede);
         return reservaRepository.findBySedeAndEstado(idSede, EstadoReservaPublica.valueOf(estado), pageable)
-                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null));
+                .map(r -> toQuery(r, fetchNombreCliente(r.getIdCliente()), null, nombreSede, null, null, null));
     }
 
     @Transactional(readOnly = true)
@@ -189,7 +190,7 @@ public class ReservaPublicaService
         ReservaPublica guardada = reservaRepository.save(reserva);
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
-                fetchNombreSede(command.getIdSede()), null, null);
+                fetchNombreSede(command.getIdSede()), null, null, null);
         if (cliente.getCorreo() == null) {
             log.warn("Reserva {} sin correo de cliente {}, no se enviará confirmación por correo", guardada.getId(), command.getIdCliente());
         }
@@ -301,7 +302,7 @@ public class ReservaPublicaService
         ReservaPublica guardada = reservaRepository.save(nueva);
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
-                fetchNombreSede(guardada.getIdSede()), null, null);
+                fetchNombreSede(guardada.getIdSede()), null, null, null);
         if (cliente.getCorreo() == null) {
             log.warn("Reprogramacion {} sin correo de cliente {}, no se enviará confirmación por correo", guardada.getId(), guardada.getIdCliente());
         }
@@ -360,7 +361,7 @@ public class ReservaPublicaService
                 null, null, AuditoriaConstants.NIVEL_CRITICAL, AuditoriaConstants.RESULTADO_EXITOSO));
 
         ReservaPublicaQuery query = toQuery(guardada, cliente.nombreCompleto(), cliente.getCorreo(),
-                fetchNombreSede(guardada.getIdSede()), null, null);
+                fetchNombreSede(guardada.getIdSede()), null, null, null);
 
         crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
                 .tipoCodigo("RESERVA_CANCELADA")
@@ -419,11 +420,14 @@ public class ReservaPublicaService
             throw new ValidationException("Solo se pueden rechazar pagos de reservas en estado PENDIENTE.");
         }
         
+        String motivoGuardado = motivo != null && !motivo.isBlank() ? motivo : "Comprobante inválido";
+
         var pagosExistentes = ventaPagoRepository.findByVentaId(reserva.getVentaId());
         for (var pago : pagosExistentes) {
             if (!pago.isEsValidado()) {
                 ventaPagoRepository.save(pago.toBuilder()
                         .referencia(null)
+                        .motivoRechazo(motivoGuardado)
                         .build());
             }
         }
@@ -434,7 +438,7 @@ public class ReservaPublicaService
                 .entidadTipo("reserva_publica")
                 .entidadId(reserva.getId())
                 .datosExtra(Map.of(
-                        "motivo", motivo != null ? motivo : "Comprobante invalido",
+                        "motivo", motivoGuardado,
                         "fecha", reserva.getFechaEvento().toString()))
                 .metadata(serializarMetadataMotivo(motivo))
                 .build());
@@ -473,6 +477,7 @@ public class ReservaPublicaService
                 ventaPagoRepository.save(pago.toBuilder()
                         .referencia(url)
                         .medioPagoCodigo("YAPE")
+                        .motivoRechazo(null)
                         .build());
                 actualizado = true;
                 break;
@@ -561,12 +566,14 @@ public class ReservaPublicaService
                 cliente != null ? cliente.getCorreo() : null,
                 fetchNombreSede(r.getIdSede()),
                 fetchMedioPago(r.getVentaId()),
-                fetchReferenciaPago(r.getVentaId()));
+                fetchReferenciaPago(r.getVentaId()),
+                fetchMotivoRechazo(r.getVentaId()));
     }
 
     private ReservaPublicaQuery toQuery(ReservaPublica r, String nombreCliente,
                                         String correoCliente, String nombreSede,
-                                        String medioPago, String referenciaPago) {
+                                        String medioPago, String referenciaPago,
+                                        String motivoRechazoPago) {
         return ReservaPublicaQuery.builder()
                 .id(r.getId())
                 .idCliente(r.getIdCliente())
@@ -594,6 +601,7 @@ public class ReservaPublicaService
                 .codigoQr(r.getCodigoQr())
                 .medioPago(medioPago)
                 .referenciaPago(referenciaPago)
+                .motivoRechazoPago(motivoRechazoPago)
                 .motivoCancelacion(r.getMotivoCancelacion())
                 .fechaCreacion(r.getCreatedAt())
                 .build();
@@ -612,6 +620,14 @@ public class ReservaPublicaService
         var pagos = ventaPagoRepository.findByVentaId(idVenta);
         if (pagos.isEmpty()) return null;
         if (pagos.size() == 1) return pagos.get(0).getReferencia();
+        return null;
+    }
+
+    private String fetchMotivoRechazo(Long idVenta) {
+        if (idVenta == null) return null;
+        var pagos = ventaPagoRepository.findByVentaId(idVenta);
+        if (pagos.isEmpty()) return null;
+        if (pagos.size() == 1) return pagos.get(0).getMotivoRechazo();
         return null;
     }
 }

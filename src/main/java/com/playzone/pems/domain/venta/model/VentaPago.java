@@ -19,6 +19,7 @@ public class VentaPago {
     private String        medioPagoCodigo;
     private BigDecimal    monto;
     private String        referencia;
+    private String        motivoRechazo;
     private boolean       esValidado;
     private UUID          validadoPor;
     private OffsetDateTime validadoAt;

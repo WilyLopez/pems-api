@@ -36,6 +36,7 @@ public class ReservaPublicaResponse {
     private final String        codigoQr;
     private final String        medioPago;
     private final String        referenciaPago;
+    private final String        motivoRechazoPago;
     private final String        motivoCancelacion;
     private final OffsetDateTime fechaCreacion;
 }

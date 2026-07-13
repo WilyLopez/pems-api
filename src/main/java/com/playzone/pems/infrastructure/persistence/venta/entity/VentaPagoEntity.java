@@ -34,6 +34,9 @@ public class VentaPagoEntity {
     @Column(name = "referencia")
     private String referencia;
 
+    @Column(name = "motivo_rechazo")
+    private String motivoRechazo;
+
     @Column(name = "es_validado", nullable = false)
     @Builder.Default
     private boolean esValidado = true;

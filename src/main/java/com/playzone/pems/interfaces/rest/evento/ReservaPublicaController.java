@@ -427,6 +427,7 @@ public class ReservaPublicaController {
                 .codigoQr(q.getCodigoQr())
                 .medioPago(q.getMedioPago())
                 .referenciaPago(q.getReferenciaPago())
+                .motivoRechazoPago(q.getMotivoRechazoPago())
                 .motivoCancelacion(q.getMotivoCancelacion())
                 .fechaCreacion(q.getFechaCreacion())
                 .build();
