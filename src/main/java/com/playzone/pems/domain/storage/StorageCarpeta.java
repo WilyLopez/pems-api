@@ -10,7 +10,8 @@ public enum StorageCarpeta {
     NOVEDADES,
     RESENAS,
     LEGAL,
-    PERFILES;
+    PERFILES,
+    SERVICIOS;
 
     public String valor() {
         return name().toLowerCase();

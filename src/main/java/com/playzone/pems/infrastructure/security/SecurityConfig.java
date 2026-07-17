@@ -59,6 +59,7 @@ public class SecurityConfig {
                                 "/api/v1/tipos-evento",
                                 "/api/v1/zonas/**",
                                 "/api/v1/servicios-cotizacion/**",
+                                "/api/v1/categorias-servicio",
                                 "/api/v1/health/ping"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, 
