@@ -9,17 +9,21 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "servicio_cotizacion")
+@Table(name = "servicio_variante")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ServicioCotizacionEntity {
+public class ServicioVarianteEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "servicio_id", nullable = false)
+    private ServicioCotizacionEntity servicio;
 
     @Column(nullable = false, length = 100)
     private String nombre;
@@ -27,20 +31,11 @@ public class ServicioCotizacionEntity {
     @Column(columnDefinition = "TEXT")
     private String descripcion;
 
-    @Column(name = "precio_referencial", nullable = false)
-    private BigDecimal precioReferencial;
-
-    @Column(length = 50)
-    private String icono;
+    @Column(nullable = false)
+    private BigDecimal precio;
 
     @Column(name = "es_activo", nullable = false)
     private boolean activo;
-
-    @Column(name = "es_destacado", nullable = false)
-    private boolean destacado;
-
-    @Column(name = "categoria_id")
-    private Long categoriaId;
 
     @Column(nullable = false)
     private int orden;
