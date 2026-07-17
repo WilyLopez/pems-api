@@ -182,6 +182,7 @@ public class ReservaPublicaService
                 .precioHistorico(precio)
                 .descuentoAplicado(descuento)
                 .totalPagado(total)
+                .duracionHistoricaMinutos(tarifa.getDuracionMinutos())
                 .nombreNino(command.getNombreNino())
                 .edadNino(command.getEdadNino())
                 .nombreAcompanante(command.getNombreAcompanante())
@@ -298,6 +299,7 @@ public class ReservaPublicaService
                 .precioHistorico(precio)
                 .descuentoAplicado(BigDecimal.ZERO)
                 .totalPagado(montoVenta)
+                .duracionHistoricaMinutos(tarifa.getDuracionMinutos())
                 .nombreNino(original.getNombreNino())
                 .edadNino(original.getEdadNino())
                 .nombreAcompanante(original.getNombreAcompanante())
@@ -455,6 +457,46 @@ public class ReservaPublicaService
         return enriquecerQuery(reserva);
     }
 
+    @Transactional
+    public ReservaPublicaQuery reembolsarPorNoShow(Long idReserva, String motivo) {
+        ReservaPublica reserva = reservaRepository.findByIdForUpdate(idReserva)
+                .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(reserva.getIdSede());
+
+        if (reserva.getEstado() != EstadoReservaPublica.VENCIDA) {
+            throw new ValidationException("Solo se pueden reembolsar reservas en estado VENCIDA.");
+        }
+
+        String motivoGuardado = "Reembolso por no-show: " + (motivo != null && !motivo.isBlank() ? motivo : "sin detalle");
+
+        ReservaPublica cancelada = reserva.toBuilder()
+                .estado(EstadoReservaPublica.CANCELADA)
+                .motivoCancelacion(motivoGuardado)
+                .build();
+        ReservaPublica guardada = reservaRepository.save(cancelada);
+
+        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+                supabaseAuthFacade.usuarioActualId().orElse(null),
+                AuditoriaConstants.ACCION_CANCELAR, AuditoriaConstants.MOD_RESERVAS,
+                "ReservaPublica", idReserva,
+                EstadoReservaPublica.VENCIDA.getCodigo(), "CANCELADA",
+                "Reserva #" + idReserva + " reembolsada por no-show: " + motivoGuardado,
+                null, null, AuditoriaConstants.NIVEL_CRITICAL, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        crearNotificacionPort.notificar(CrearNotificacionCommand.builder()
+                .tipoCodigo("RESERVA_REEMBOLSADA")
+                .destinatarioClienteId(guardada.getIdCliente())
+                .entidadTipo("reserva_publica")
+                .entidadId(guardada.getId())
+                .datosExtra(Map.of(
+                        "fecha", guardada.getFechaEvento().toString(),
+                        "monto", guardada.getTotalPagado() != null ? guardada.getTotalPagado().toPlainString() : "",
+                        "ventaId", guardada.getVentaId() != null ? guardada.getVentaId().toString() : ""))
+                .build());
+
+        return enriquecerQuery(guardada);
+    }
+
     private String serializarMetadataMotivo(String motivo) {
         try {
             return objectMapper.writeValueAsString(Map.of(
@@ -544,6 +586,10 @@ public class ReservaPublicaService
 
     private void validarAccesoAOperar(ReservaPublica reserva) {
         if (supabaseAuthFacade.tieneRol("CLIENTE")) {
+            if (reserva.getEstado() == EstadoReservaPublica.VENCIDA) {
+                throw new AccessDeniedException(
+                        "Esta reserva vencio por falta de ingreso. Contacta al local para reprogramarla o solicitar un reembolso.");
+            }
             Long propio = supabaseAuthFacade.clientePerfilId()
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.FORBIDDEN, "Cliente sin perfil asociado"));
@@ -653,6 +699,8 @@ public class ReservaPublicaService
                 .vecesReprogramada(r.getVecesReprogramada())
                 .ingresado(r.isIngresado())
                 .fechaIngreso(r.getIngresoAt())
+                .duracionHistoricaMinutos(r.getDuracionHistoricaMinutos())
+                .permanenciaFinAt(r.getPermanenciaFinAt())
                 .codigoQr(r.getCodigoQr())
                 .medioPago(medioPago)
                 .referenciaPago(referenciaPago)

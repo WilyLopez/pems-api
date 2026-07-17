@@ -35,6 +35,9 @@ public class TarifaEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal precio;
 
+    @Column(name = "duracion_minutos")
+    private Integer duracionMinutos;
+
     @Column(name = "vigencia_desde", nullable = false)
     private LocalDate vigenciaDesde;
 

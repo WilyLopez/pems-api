@@ -153,6 +153,7 @@ public class VentaMostradorService {
         EstadoReservaPublica estadoInicial = EstadoReservaPublica.CONFIRMADA;
         boolean ingresado = false;
         OffsetDateTime ingresoAt = null;
+        OffsetDateTime permanenciaFinAt = null;
 
         if (esHoy) {
             if (horaActual.isBefore(apertura)) {
@@ -161,6 +162,12 @@ public class VentaMostradorService {
                 estadoInicial = EstadoReservaPublica.COMPLETADA;
                 ingresado = true;
                 ingresoAt = OffsetDateTime.now(zoneId);
+
+                OffsetDateTime cierreDelDia = cmd.getFechaVisita().atTime(cierre).atZone(zoneId).toOffsetDateTime();
+                OffsetDateTime limiteDuracion = tarifa.getDuracionMinutos() != null
+                        ? ingresoAt.plusMinutes(tarifa.getDuracionMinutos())
+                        : cierreDelDia;
+                permanenciaFinAt = limiteDuracion.isBefore(cierreDelDia) ? limiteDuracion : cierreDelDia;
             }
         }
 
@@ -177,6 +184,7 @@ public class VentaMostradorService {
                     .precioHistorico(precioBase)
                     .descuentoAplicado(descuentoPorNino)
                     .totalPagado(totalPorNino)
+                    .duracionHistoricaMinutos(tarifa.getDuracionMinutos())
                     .nombreNino(nino.getNombreNino())
                     .edadNino(nino.getEdadNino())
                     .nombreAcompanante(cmd.getNombreAcompanante())
@@ -185,6 +193,7 @@ public class VentaMostradorService {
                     .firmoConsentimiento(cmd.isActaFirmada())
                     .ingresado(ingresado)
                     .ingresoAt(ingresoAt)
+                    .permanenciaFinAt(permanenciaFinAt)
                     .esReprogramacion(false)
                     .vecesReprogramada(0)
                     .createdBy(usuarioActual)

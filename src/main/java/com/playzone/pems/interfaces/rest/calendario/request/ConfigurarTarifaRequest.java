@@ -18,6 +18,9 @@ public class ConfigurarTarifaRequest {
     @NotNull @DecimalMin(value = "0.01") @Digits(integer = 8, fraction = 2)
     private BigDecimal precio;
 
+    @Min(1)
+    private Integer duracionMinutos;
+
     @NotNull @FutureOrPresent
     private LocalDate vigenciaDesde;
 

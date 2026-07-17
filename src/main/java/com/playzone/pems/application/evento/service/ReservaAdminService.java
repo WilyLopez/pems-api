@@ -181,10 +181,15 @@ public class ReservaAdminService
             throw new ValidationException("Este ticket no puede ser ingresado sin estar asociado a una venta (pago registrado).");
         }
 
+        OffsetDateTime ingresoAt = OffsetDateTime.now(FechaUtil.ZONA_PERU);
+        ConfiguracionCalendario cfg = configRepository.obtener(r.getIdSede());
+        OffsetDateTime permanenciaFinAt = calcularPermanenciaFinAt(r, ingresoAt, cfg);
+
         ReservaPublica actualizada = r.toBuilder()
                 .ingresado(true)
                 .estado(EstadoReservaPublica.COMPLETADA)
-                .ingresoAt(OffsetDateTime.now(ZoneId.of("America/Lima")))
+                .ingresoAt(ingresoAt)
+                .permanenciaFinAt(permanenciaFinAt)
                 .build();
         ReservaPublica guardada = reservaRepository.save(actualizada);
 
@@ -199,6 +204,65 @@ public class ReservaAdminService
         notificarIngresoConfirmado(guardada.getIdCliente(), guardada.getId(), guardada.getNumeroTicket());
 
         return toDetalle(guardada);
+    }
+
+    private OffsetDateTime calcularPermanenciaFinAt(
+            ReservaPublica reserva, OffsetDateTime ingresoAt, ConfiguracionCalendario cfg) {
+        OffsetDateTime cierreDelDia = reserva.getFechaEvento()
+                .atTime(cfg.getHoraCierre())
+                .atZone(FechaUtil.ZONA_PERU)
+                .toOffsetDateTime();
+        OffsetDateTime limiteDuracion = reserva.getDuracionHistoricaMinutos() != null
+                ? ingresoAt.plusMinutes(reserva.getDuracionHistoricaMinutos())
+                : cierreDelDia;
+        return limiteDuracion.isBefore(cierreDelDia) ? limiteDuracion : cierreDelDia;
+    }
+
+    @Transactional
+    public TicketDetalleQuery revertirIngreso(Long idReserva) {
+        ReservaPublica r = reservaRepository.findByIdForUpdate(idReserva)
+                .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(r.getIdSede());
+
+        if (!r.isIngresado()) {
+            throw new ValidationException("Este ticket no tiene un ingreso registrado.");
+        }
+
+        ReservaPublica actualizada = r.toBuilder()
+                .ingresado(false)
+                .estado(EstadoReservaPublica.CONFIRMADA)
+                .ingresoAt(null)
+                .permanenciaFinAt(null)
+                .salidaRealAt(null)
+                .build();
+        ReservaPublica guardada = reservaRepository.save(actualizada);
+
+        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+                authFacade.usuarioActualId().orElse(null),
+                AuditoriaConstants.ACCION_ACTUALIZAR, AuditoriaConstants.MOD_RESERVAS,
+                "ReservaPublica", idReserva,
+                "COMPLETADA", "CONFIRMADA",
+                "Ingreso revertido para ticket " + guardada.getNumeroTicket(),
+                null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        return toDetalle(guardada);
+    }
+
+    @Transactional
+    public TicketDetalleQuery registrarSalida(Long idReserva) {
+        ReservaPublica r = reservaRepository.findByIdForUpdate(idReserva)
+                .orElseThrow(() -> new ReservaNotFoundException(idReserva));
+        sedeScope.validarAcceso(r.getIdSede());
+
+        if (!r.isIngresado()) {
+            throw new ValidationException("Este ticket aun no registra ingreso.");
+        }
+
+        ReservaPublica actualizada = r.toBuilder()
+                .salidaRealAt(OffsetDateTime.now(FechaUtil.ZONA_PERU))
+                .build();
+
+        return toDetalle(reservaRepository.save(actualizada));
     }
 
     @Transactional
@@ -288,6 +352,7 @@ public class ReservaAdminService
 
     private TicketDetalleQuery toDetalle(ReservaPublica r) {
         LocalDate hoy = FechaUtil.hoy();
+        OffsetDateTime ahora = OffsetDateTime.now(FechaUtil.ZONA_PERU);
         String estadoPago = r.getEstado() == EstadoReservaPublica.PENDIENTE ? "PENDIENTE" : "PAGADO";
         return TicketDetalleQuery.builder()
                 .idReserva(r.getId())
@@ -295,6 +360,8 @@ public class ReservaAdminService
                 .estado(r.getEstado().getCodigo())
                 .yaIngreso(r.isIngresado())
                 .fechaIngreso(r.getIngresoAt())
+                .permanenciaVigente(r.estaDentroDePermanencia(ahora))
+                .permanenciaFinAt(r.getPermanenciaFinAt())
                 .fechaVisita(r.getFechaEvento())
                 .esHoy(r.getFechaEvento().isEqual(hoy))
                 .nombreNino(r.getNombreNino())

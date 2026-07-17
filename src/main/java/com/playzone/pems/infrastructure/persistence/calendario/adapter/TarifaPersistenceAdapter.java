@@ -53,6 +53,7 @@ public class TarifaPersistenceAdapter implements TarifaRepository {
                 .sede(sede)
                 .tipoDia(tarifa.getTipoDia())
                 .precio(tarifa.getPrecio())
+                .duracionMinutos(tarifa.getDuracionMinutos())
                 .vigenciaDesde(tarifa.getVigenciaDesde())
                 .vigenciaHasta(tarifa.getVigenciaHasta())
                 .activo(tarifa.isActivo())

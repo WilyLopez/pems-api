@@ -158,6 +158,7 @@ public class EventoPrivadoController {
                                         .descripcionPersonalizada(request.getDescripcionPersonalizada())
                                         .presupuestoEstimado(request.getPresupuestoEstimado())
                                         .idsServiciosCotizacion(request.getIdsServiciosCotizacion())
+                                        .variantesSeleccionadas(request.getVariantesSeleccionadas())
                                         .esCotizacionPersonalizada(request.isEsCotizacionPersonalizada())
                                         .build()))));
     }

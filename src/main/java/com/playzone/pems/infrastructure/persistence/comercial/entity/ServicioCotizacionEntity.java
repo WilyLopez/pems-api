@@ -36,6 +36,12 @@ public class ServicioCotizacionEntity {
     @Column(name = "es_activo", nullable = false)
     private boolean activo;
 
+    @Column(name = "es_destacado", nullable = false)
+    private boolean destacado;
+
+    @Column(name = "categoria_id")
+    private Long categoriaId;
+
     @Column(nullable = false)
     private int orden;
 
@@ -46,4 +52,7 @@ public class ServicioCotizacionEntity {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
 }

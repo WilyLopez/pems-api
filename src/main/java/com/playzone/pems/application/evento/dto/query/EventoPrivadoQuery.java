@@ -46,6 +46,7 @@ public class EventoPrivadoQuery {
     private final OffsetDateTime             horaFinReal;
     private final List<ChecklistEventoQuery> checklist;
     private final List<EventoExtraQuery>    extras;
+    private final List<EventoServicioQuery> servicios;
     private final String                    medioPago;
     private final OffsetDateTime             fechaCreacion;
     private final String                    modalidadPago;

@@ -215,6 +215,56 @@ class ClientePerfilServiceTest {
     }
 
     @Test
+    void testActualizarCompletaDocumentoCuandoNoTenia() {
+        ClientePerfil existente = ClientePerfil.builder()
+                .id(10L).nombres("Ana").tipoDocumentoCodigo("DNI").numeroDocumento(null).build();
+        when(clientePerfilRepository.buscarPorId(10L)).thenReturn(Optional.of(existente));
+        when(clientePerfilRepository.buscarPorDocumento("DNI", "87654321")).thenReturn(Optional.empty());
+        when(clientePerfilRepository.guardar(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ActualizarClientePerfilCommand comando = ActualizarClientePerfilCommand.builder()
+                .numeroDocumento("87654321")
+                .build();
+
+        ClientePerfil resultado = clientePerfilService.ejecutar(10L, comando);
+
+        assertEquals("87654321", resultado.getNumeroDocumento());
+    }
+
+    @Test
+    void testActualizarNoSobrescribeDocumentoYaExistente() {
+        ClientePerfil existente = ClientePerfil.builder()
+                .id(10L).nombres("Ana").tipoDocumentoCodigo("DNI").numeroDocumento("11223344").build();
+        when(clientePerfilRepository.buscarPorId(10L)).thenReturn(Optional.of(existente));
+        when(clientePerfilRepository.guardar(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ActualizarClientePerfilCommand comando = ActualizarClientePerfilCommand.builder()
+                .numeroDocumento("99999999")
+                .build();
+
+        ClientePerfil resultado = clientePerfilService.ejecutar(10L, comando);
+
+        assertEquals("11223344", resultado.getNumeroDocumento());
+        verify(clientePerfilRepository, never()).buscarPorDocumento(anyString(), anyString());
+    }
+
+    @Test
+    void testActualizarDocumentoDuplicadoLanzaValidationException() {
+        ClientePerfil existente = ClientePerfil.builder()
+                .id(10L).nombres("Ana").tipoDocumentoCodigo("DNI").numeroDocumento(null).build();
+        when(clientePerfilRepository.buscarPorId(10L)).thenReturn(Optional.of(existente));
+        when(clientePerfilRepository.buscarPorDocumento("DNI", "87654321"))
+                .thenReturn(Optional.of(ClientePerfil.builder().id(99L).build()));
+
+        ActualizarClientePerfilCommand comando = ActualizarClientePerfilCommand.builder()
+                .numeroDocumento("87654321")
+                .build();
+
+        assertThrows(ValidationException.class, () -> clientePerfilService.ejecutar(10L, comando));
+        verify(clientePerfilRepository, never()).guardar(any());
+    }
+
+    @Test
     void testActualizarConMismoCorreoNoDisparaVerificacion() {
         ClientePerfil existente = clienteConCorreo("actual@correo.com");
         when(clientePerfilRepository.buscarPorId(10L)).thenReturn(Optional.of(existente));

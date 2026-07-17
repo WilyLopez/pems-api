@@ -28,6 +28,10 @@ public class TarifaService implements ConfigurarTarifaUseCase {
             throw new ValidationException("vigenciaHasta", "La vigencia final no puede ser anterior a la inicial.");
         }
 
+        if (command.getDuracionMinutos() != null && command.getDuracionMinutos() <= 0) {
+            throw new ValidationException("duracionMinutos", "La duracion debe ser mayor a 0 minutos.");
+        }
+
         tarifaRepository.desactivarAnterioresBySedeAndTipoDia(
                 command.getIdSede(), command.getTipoDia());
 
@@ -35,6 +39,7 @@ public class TarifaService implements ConfigurarTarifaUseCase {
                 .idSede(command.getIdSede())
                 .tipoDia(command.getTipoDia())
                 .precio(command.getPrecio())
+                .duracionMinutos(command.getDuracionMinutos())
                 .vigenciaDesde(command.getVigenciaDesde())
                 .vigenciaHasta(command.getVigenciaHasta())
                 .activo(true)

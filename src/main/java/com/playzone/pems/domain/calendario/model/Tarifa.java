@@ -17,6 +17,7 @@ public class Tarifa {
     private Long          idSede;
     private TipoDia       tipoDia;
     private BigDecimal    precio;
+    private Integer       duracionMinutos;
     private LocalDate     vigenciaDesde;
     private LocalDate     vigenciaHasta;
     private boolean       activo;
@@ -31,5 +32,9 @@ public class Tarifa {
 
     public boolean aplicaParaTipoDia(TipoDia tipoDia) {
         return this.tipoDia == tipoDia;
+    }
+
+    public boolean esPermanenciaLimitada() {
+        return duracionMinutos != null;
     }
 }

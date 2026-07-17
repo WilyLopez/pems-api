@@ -19,6 +19,8 @@ public class TicketDetalleResponse {
     private String        estado;
     private boolean       yaIngreso;
     private OffsetDateTime fechaIngreso;
+    private boolean       permanenciaVigente;
+    private OffsetDateTime permanenciaFinAt;
     private LocalDate     fechaVisita;
     private boolean       esHoy;
     private String        nombreNino;

@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 @Getter
@@ -21,6 +22,7 @@ public class ClientePerfilResponse {
     private String         nombreCompleto;
     private String         correo;
     private String         telefono;
+    private LocalDate      fechaNacimiento;
     private boolean        esVip;
     private BigDecimal     descuentoVip;
     private int            contadorVisitas;

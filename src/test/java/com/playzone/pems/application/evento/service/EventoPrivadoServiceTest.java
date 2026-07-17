@@ -16,16 +16,21 @@ import com.playzone.pems.domain.calendario.repository.BloqueCalendarioRepository
 import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.domain.calendario.repository.FeriadoRepository;
 import com.playzone.pems.domain.calendario.repository.TurnoRepository;
+import com.playzone.pems.domain.comercial.model.ServicioCotizacion;
+import com.playzone.pems.domain.comercial.model.ServicioVariante;
 import com.playzone.pems.domain.comercial.model.TipoEvento;
 import com.playzone.pems.domain.comercial.repository.ExtraPaqueteRepository;
 import com.playzone.pems.domain.comercial.repository.ServicioCotizacionRepository;
+import com.playzone.pems.domain.comercial.repository.ServicioVarianteRepository;
 import com.playzone.pems.domain.comercial.repository.TipoEventoRepository;
 import com.playzone.pems.domain.evento.model.EventoCuota;
 import com.playzone.pems.domain.evento.model.EventoPrivado;
+import com.playzone.pems.domain.evento.model.EventoServicio;
 import com.playzone.pems.domain.evento.model.enums.EstadoEventoPrivado;
 import com.playzone.pems.domain.evento.repository.ChecklistEventoRepository;
 import com.playzone.pems.domain.evento.repository.EventoCuotaRepository;
 import com.playzone.pems.domain.evento.repository.EventoExtraRepository;
+import com.playzone.pems.domain.evento.repository.EventoServicioRepository;
 import com.playzone.pems.domain.evento.repository.EventoPrivadoRepository;
 import com.playzone.pems.domain.evento.repository.ReservaPublicaRepository;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
@@ -36,6 +41,7 @@ import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
 import com.playzone.pems.domain.venta.repository.VentaRepository;
 import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
+import com.playzone.pems.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +53,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,11 +73,13 @@ class EventoPrivadoServiceTest {
     @Mock private ConfiguracionCalendarioRepository configRepository;
     @Mock private EnviarNotificacionEventoPort notificacionPort;
     @Mock private EventoExtraRepository eventoExtraRepository;
+    @Mock private EventoServicioRepository eventoServicioRepository;
     @Mock private VentaRepository ventaRepository;
     @Mock private VentaPagoRepository ventaPagoRepository;
     @Mock private SupabaseAuthFacade supabaseAuthFacade;
     @Mock private ExtraPaqueteRepository extraPaqueteRepository;
     @Mock private ServicioCotizacionRepository servicioCotizacionRepository;
+    @Mock private ServicioVarianteRepository servicioVarianteRepository;
     @Mock private TipoEventoRepository tipoEventoRepository;
     @Mock private EventoCuotaRepository cuotaRepository;
     @Mock private ChecklistEventoRepository checklistRepository;
@@ -87,8 +96,8 @@ class EventoPrivadoServiceTest {
         service = new EventoPrivadoService(
                 eventoRepository, reservaRepository, clientePerfilRepository, bloqueRepository,
                 feriadoRepository, turnoRepository, configRepository, notificacionPort,
-                eventoExtraRepository, ventaRepository, ventaPagoRepository, supabaseAuthFacade,
-                extraPaqueteRepository, servicioCotizacionRepository, tipoEventoRepository,
+                eventoExtraRepository, eventoServicioRepository, ventaRepository, ventaPagoRepository, supabaseAuthFacade,
+                extraPaqueteRepository, servicioCotizacionRepository, servicioVarianteRepository, tipoEventoRepository,
                 cuotaRepository, checklistRepository, perfilUsuarioRepository, enrutadorCajaService,
                 auditoria, crearNotificacionPort, sedeScope, new ObjectMapper());
     }
@@ -131,6 +140,138 @@ class EventoPrivadoServiceTest {
         assertEquals("EVENTO_PRESUPUESTO_ENVIADO", captor.getValue().getTipoCodigo());
         assertEquals(5L, captor.getValue().getDestinatarioClienteId());
         verify(crearNotificacionPort, never()).notificar(any());
+    }
+
+    @Test
+    void testSolicitarEventoConServiciosPersisteEventoServicioConPrecioCongelado() {
+        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
+                Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .diasMinEventoPrivado(1).diasMaxEventoPrivado(365).build());
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+        when(eventoRepository.save(any())).thenAnswer(inv -> {
+            EventoPrivado arg = inv.getArgument(0);
+            return arg.toBuilder().id(200L).build();
+        });
+        when(clientePerfilRepository.buscarPorId(5L)).thenReturn(Optional.of(clientePrueba()));
+        when(servicioCotizacionRepository.findAllActivos()).thenReturn(List.of(
+                ServicioCotizacion.builder().id(10L).nombre("Show de Titeres")
+                        .precioReferencial(new BigDecimal("150.00")).activo(true).orden(0).build()));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .idsServiciosCotizacion(List.of(10L))
+                .build();
+
+        service.ejecutar(comando);
+
+        ArgumentCaptor<List<EventoServicio>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventoServicioRepository).saveAll(captor.capture());
+        List<EventoServicio> guardados = captor.getValue();
+        assertEquals(1, guardados.size());
+        EventoServicio guardado = guardados.get(0);
+        assertEquals(200L, guardado.getIdEventoPrivado());
+        assertEquals(10L, guardado.getIdServicioCotizacion());
+        assertEquals("Show de Titeres", guardado.getNombreLibre());
+        assertEquals(new BigDecimal("150.00"), guardado.getPrecioAcordado());
+        assertTrue(guardado.isIncluido());
+    }
+
+    @Test
+    void testSolicitarEventoSinServiciosNoPersisteEventoServicio() {
+        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
+                Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .diasMinEventoPrivado(1).diasMaxEventoPrivado(365).build());
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+        when(eventoRepository.save(any())).thenAnswer(inv -> {
+            EventoPrivado arg = inv.getArgument(0);
+            return arg.toBuilder().id(200L).build();
+        });
+        when(clientePerfilRepository.buscarPorId(5L)).thenReturn(Optional.of(clientePrueba()));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .build();
+
+        service.ejecutar(comando);
+
+        verify(eventoServicioRepository, never()).saveAll(any());
+        verify(servicioCotizacionRepository, never()).findAllActivos();
+    }
+
+    @Test
+    void testSolicitarEventoConVarianteSeleccionadaPersistePrecioDeLaVariante() {
+        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
+                Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .diasMinEventoPrivado(1).diasMaxEventoPrivado(365).build());
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+        when(eventoRepository.save(any())).thenAnswer(inv -> {
+            EventoPrivado arg = inv.getArgument(0);
+            return arg.toBuilder().id(200L).build();
+        });
+        when(clientePerfilRepository.buscarPorId(5L)).thenReturn(Optional.of(clientePrueba()));
+        when(servicioCotizacionRepository.findAllActivos()).thenReturn(List.of(
+                ServicioCotizacion.builder().id(10L).nombre("Torta")
+                        .precioReferencial(new BigDecimal("50.00")).activo(true).orden(0).build()));
+        when(servicioVarianteRepository.findByServicio(10L)).thenReturn(List.of(
+                ServicioVariante.builder().id(100L).idServicio(10L).nombre("Grande")
+                        .precio(new BigDecimal("120.00")).activo(true).orden(0).build()));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .idsServiciosCotizacion(List.of(10L))
+                .variantesSeleccionadas(Map.of(10L, 100L))
+                .build();
+
+        service.ejecutar(comando);
+
+        ArgumentCaptor<List<EventoServicio>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventoServicioRepository).saveAll(captor.capture());
+        EventoServicio guardado = captor.getValue().get(0);
+        assertEquals(10L, guardado.getIdServicioCotizacion());
+        assertEquals(100L, guardado.getIdServicioVariante());
+        assertEquals("Torta - Grande", guardado.getNombreLibre());
+        assertEquals(new BigDecimal("120.00"), guardado.getPrecioAcordado());
+    }
+
+    @Test
+    void testSolicitarEventoConServicioConVariantesSinSeleccionarLanzaValidationException() {
+        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
+                Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .diasMinEventoPrivado(1).diasMaxEventoPrivado(365).build());
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+        when(eventoRepository.save(any())).thenAnswer(inv -> {
+            EventoPrivado arg = inv.getArgument(0);
+            return arg.toBuilder().id(200L).build();
+        });
+        when(servicioCotizacionRepository.findAllActivos()).thenReturn(List.of(
+                ServicioCotizacion.builder().id(10L).nombre("Torta")
+                        .precioReferencial(new BigDecimal("50.00")).activo(true).orden(0).build()));
+        when(servicioVarianteRepository.findByServicio(10L)).thenReturn(List.of(
+                ServicioVariante.builder().id(100L).idServicio(10L).nombre("Grande")
+                        .precio(new BigDecimal("120.00")).activo(true).orden(0).build()));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .idsServiciosCotizacion(List.of(10L))
+                .build();
+
+        assertThrows(ValidationException.class, () -> service.ejecutar(comando));
     }
 
     @Test

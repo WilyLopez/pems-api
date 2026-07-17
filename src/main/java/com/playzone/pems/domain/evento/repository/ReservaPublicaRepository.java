@@ -36,6 +36,8 @@ public interface ReservaPublicaRepository {
 
     List<ReservaPublica> findPendientesBySedeAndFecha(Long idSede, LocalDate fecha);
 
+    List<ReservaPublica> findConfirmadasSinIngresoAntesDe(Long idSede, LocalDate fecha);
+
     int countConfirmadasBySedeAndFecha(Long idSede, LocalDate fecha);
 
     int countActivasBySedeAndFecha(Long idSede, LocalDate fecha);

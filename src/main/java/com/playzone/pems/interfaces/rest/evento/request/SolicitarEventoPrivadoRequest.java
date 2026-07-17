@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @NoArgsConstructor
@@ -47,5 +48,6 @@ public class SolicitarEventoPrivadoRequest {
     private String       descripcionPersonalizada;
     private BigDecimal   presupuestoEstimado;
     private List<Long>   idsServiciosCotizacion;
+    private Map<Long, Long> variantesSeleccionadas;
     private boolean      esCotizacionPersonalizada;
 }

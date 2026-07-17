@@ -34,6 +34,8 @@ public class ReservaPublicaQuery {
     private final int           vecesReprogramada;
     private final boolean       ingresado;
     private final OffsetDateTime fechaIngreso;
+    private final Integer       duracionHistoricaMinutos;
+    private final OffsetDateTime permanenciaFinAt;
     private final String        codigoQr;
     private final String        medioPago;
     private final String        referenciaPago;
