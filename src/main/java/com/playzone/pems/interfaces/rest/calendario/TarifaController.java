@@ -60,7 +60,7 @@ public class TarifaController {
         List<TarifaResponse> tarifas = tarifaRepository.findActivasBySede(idSede)
                 .stream()
                 .map(t -> new TarifaResponse(
-                        t.getId(), t.getTipoDia().getCodigo(), t.getPrecio(),
+                        t.getId(), t.getTipoDia().getCodigo(), t.getPrecio(), t.getDuracionMinutos(),
                         t.getVigenciaDesde(), t.getVigenciaHasta(), t.isActivo()))
                 .toList();
         return ResponseEntity.ok(ApiResponse.ok(tarifas));
@@ -73,7 +73,8 @@ public class TarifaController {
                 .map(t -> new PrecioPublicoResponse(
                         t.getTipoDia().getCodigo(),
                         t.getTipoDia() == TipoDia.SEMANA ? "Lunes a Viernes" : "Sabados, Domingos y Feriados",
-                        t.getPrecio()))
+                        t.getPrecio(),
+                        t.getDuracionMinutos()))
                 .toList();
         return ResponseEntity.ok(ApiResponse.ok(precios));
     }
@@ -88,6 +89,7 @@ public class TarifaController {
                 .idSede(idSede)
                 .tipoDia(request.getTipoDia())
                 .precio(request.getPrecio())
+                .duracionMinutos(request.getDuracionMinutos())
                 .vigenciaDesde(request.getVigenciaDesde())
                 .vigenciaHasta(request.getVigenciaHasta())
                 .build());
@@ -104,9 +106,9 @@ public class TarifaController {
     }
 
     record TarifaResponse(
-            Long id, String tipoDia, BigDecimal precio,
+            Long id, String tipoDia, BigDecimal precio, Integer duracionMinutos,
             LocalDate vigenciaDesde, LocalDate vigenciaHasta, boolean activo) {}
 
     record PrecioPublicoResponse(
-            String tipoDia, String descripcion, BigDecimal precio) {}
+            String tipoDia, String descripcion, BigDecimal precio, Integer duracionMinutos) {}
 }

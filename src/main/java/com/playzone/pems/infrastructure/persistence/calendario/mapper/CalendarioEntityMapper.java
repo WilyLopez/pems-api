@@ -52,6 +52,7 @@ public class CalendarioEntityMapper {
                 .idSede(e.getSede().getId())
                 .tipoDia(e.getTipoDia())
                 .precio(e.getPrecio())
+                .duracionMinutos(e.getDuracionMinutos())
                 .vigenciaDesde(e.getVigenciaDesde())
                 .vigenciaHasta(e.getVigenciaHasta())
                 .activo(e.isActivo())
