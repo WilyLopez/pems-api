@@ -23,6 +23,9 @@ public class ConfigurarTarifaCommand {
     @Digits(integer = 8, fraction = 2)
     private final BigDecimal precio;
 
+    @Min(1)
+    private final Integer duracionMinutos;
+
     @NotNull
     @FutureOrPresent
     private final LocalDate vigenciaDesde;
