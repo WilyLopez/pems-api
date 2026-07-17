@@ -42,6 +42,7 @@ public class EventoPrivadoResponseMapper {
                 .horaInicioReal(q.getHoraInicioReal())
                 .horaFinReal(q.getHoraFinReal())
                 .extras(q.getExtras())
+                .servicios(q.getServicios())
                 .medioPago(q.getMedioPago())
                 .fechaCreacion(q.getFechaCreacion())
                 .modalidadPago(q.getModalidadPago())

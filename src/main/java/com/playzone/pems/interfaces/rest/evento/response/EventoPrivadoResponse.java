@@ -2,6 +2,7 @@ package com.playzone.pems.interfaces.rest.evento.response;
 
 import com.playzone.pems.application.evento.dto.query.EventoCuotaQuery;
 import com.playzone.pems.application.evento.dto.query.EventoExtraQuery;
+import com.playzone.pems.application.evento.dto.query.EventoServicioQuery;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -46,6 +47,7 @@ public class EventoPrivadoResponse {
     private final OffsetDateTime     horaInicioReal;
     private final OffsetDateTime     horaFinReal;
     private final List<EventoExtraQuery> extras;
+    private final List<EventoServicioQuery> servicios;
     private final String            medioPago;
     private final OffsetDateTime     fechaCreacion;
     private final String            modalidadPago;

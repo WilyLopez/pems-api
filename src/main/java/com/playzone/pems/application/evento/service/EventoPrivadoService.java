@@ -11,6 +11,7 @@ import com.playzone.pems.application.evento.dto.command.VentaPagoItem;
 import com.playzone.pems.application.evento.dto.query.EventoCuotaQuery;
 import com.playzone.pems.application.evento.dto.query.EventoExtraQuery;
 import com.playzone.pems.application.evento.dto.query.EventoPrivadoQuery;
+import com.playzone.pems.application.evento.dto.query.EventoServicioQuery;
 import com.playzone.pems.application.evento.dto.query.KpisEventosQuery;
 import com.playzone.pems.application.evento.port.in.BuscarEventosAdminUseCase;
 import com.playzone.pems.application.evento.port.in.CancelarEventoPrivadoUseCase;
@@ -27,10 +28,12 @@ import com.playzone.pems.domain.calendario.exception.FechaNoDisponibleException;
 import com.playzone.pems.domain.evento.model.EventoCuota;
 import com.playzone.pems.domain.evento.model.EventoExtra;
 import com.playzone.pems.domain.evento.model.EventoPrivado;
+import com.playzone.pems.domain.evento.model.EventoServicio;
 import com.playzone.pems.domain.evento.model.enums.EstadoEventoPrivado;
 import com.playzone.pems.domain.evento.repository.ChecklistEventoRepository;
 import com.playzone.pems.domain.evento.repository.EventoCuotaRepository;
 import com.playzone.pems.domain.evento.repository.EventoExtraRepository;
+import com.playzone.pems.domain.evento.repository.EventoServicioRepository;
 import com.playzone.pems.domain.evento.repository.EventoPrivadoRepository;
 import com.playzone.pems.domain.evento.repository.ReservaPublicaRepository;
 import com.playzone.pems.domain.calendario.model.ConfiguracionCalendario;
@@ -39,8 +42,11 @@ import com.playzone.pems.domain.calendario.repository.BloqueCalendarioRepository
 import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.domain.calendario.repository.FeriadoRepository;
 import com.playzone.pems.domain.calendario.repository.TurnoRepository;
+import com.playzone.pems.domain.comercial.model.ServicioCotizacion;
+import com.playzone.pems.domain.comercial.model.ServicioVariante;
 import com.playzone.pems.domain.comercial.repository.ExtraPaqueteRepository;
 import com.playzone.pems.domain.comercial.repository.ServicioCotizacionRepository;
+import com.playzone.pems.domain.comercial.repository.ServicioVarianteRepository;
 import com.playzone.pems.domain.comercial.repository.TipoEventoRepository;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
 import com.playzone.pems.domain.usuario.model.PerfilUsuario;
@@ -93,11 +99,13 @@ public class EventoPrivadoService
     private final ConfiguracionCalendarioRepository configRepository;
     private final EnviarNotificacionEventoPort    notificacionPort;
     private final EventoExtraRepository           eventoExtraRepository;
+    private final EventoServicioRepository        eventoServicioRepository;
     private final VentaRepository                 ventaRepository;
     private final VentaPagoRepository             ventaPagoRepository;
     private final SupabaseAuthFacade              supabaseAuthFacade;
     private final ExtraPaqueteRepository          extraPaqueteRepository;
     private final ServicioCotizacionRepository    servicioCotizacionRepository;
+    private final ServicioVarianteRepository      servicioVarianteRepository;
     private final TipoEventoRepository            tipoEventoRepository;
     private final EventoCuotaRepository           cuotaRepository;
     private final ChecklistEventoRepository       checklistRepository;
@@ -220,7 +228,7 @@ public class EventoPrivadoService
 
         EventoPrivado guardado = eventoRepository.save(evento);
         persistirExtras(guardado.getId(), command.getIdsExtras(), command.getExtrasLibres());
-        persistirServiciosCotizacion(guardado.getId(), command.getIdsServiciosCotizacion());
+        persistirServiciosCotizacion(guardado.getId(), command.getIdsServiciosCotizacion(), command.getVariantesSeleccionadas());
 
         ClientePerfil cliente = obtenerCliente(guardado.getIdCliente());
         Turno         turno   = obtenerTurno(guardado.getIdTurno());
@@ -706,16 +714,47 @@ public class EventoPrivadoService
 
     // ─── Persistencia auxiliar ────────────────────────────────────────────────
 
-    private void persistirServiciosCotizacion(Long idEvento, List<Long> idsServicios) {
+    private void persistirServiciosCotizacion(Long idEvento, List<Long> idsServicios, Map<Long, Long> variantesSeleccionadas) {
         if (idsServicios == null || idsServicios.isEmpty()) return;
-        List<EventoExtra> extras = servicioCotizacionRepository.findAllActivos().stream()
+        Map<Long, Long> variantes = variantesSeleccionadas != null ? variantesSeleccionadas : Map.of();
+        List<ServicioCotizacion> seleccionados = servicioCotizacionRepository.findAllActivos().stream()
                 .filter(s -> idsServicios.contains(s.getId()))
-                .map(s -> EventoExtra.builder()
-                        .idEventoPrivado(idEvento)
-                        .nombreLibre("Servicio: " + s.getNombre())
-                        .build())
                 .toList();
-        if (!extras.isEmpty()) eventoExtraRepository.saveAll(extras);
+        List<EventoServicio> servicios = seleccionados.stream()
+                .map(s -> construirEventoServicio(idEvento, s, variantes.get(s.getId())))
+                .toList();
+        if (!servicios.isEmpty()) eventoServicioRepository.saveAll(servicios);
+    }
+
+    private EventoServicio construirEventoServicio(Long idEvento, ServicioCotizacion servicio, Long idVarianteSeleccionada) {
+        List<ServicioVariante> variantesActivas = servicioVarianteRepository.findByServicio(servicio.getId()).stream()
+                .filter(ServicioVariante::isActivo)
+                .toList();
+
+        if (variantesActivas.isEmpty()) {
+            return EventoServicio.builder()
+                    .idEventoPrivado(idEvento)
+                    .idServicioCotizacion(servicio.getId())
+                    .nombreLibre(servicio.getNombre())
+                    .precioAcordado(servicio.getPrecioReferencial())
+                    .incluido(true)
+                    .build();
+        }
+
+        ServicioVariante variante = variantesActivas.stream()
+                .filter(v -> v.getId().equals(idVarianteSeleccionada))
+                .findFirst()
+                .orElseThrow(() -> new ValidationException(
+                        "Debes seleccionar una variante para el servicio '" + servicio.getNombre() + "'."));
+
+        return EventoServicio.builder()
+                .idEventoPrivado(idEvento)
+                .idServicioCotizacion(servicio.getId())
+                .idServicioVariante(variante.getId())
+                .nombreLibre(servicio.getNombre() + " - " + variante.getNombre())
+                .precioAcordado(variante.getPrecio())
+                .incluido(true)
+                .build();
     }
 
     private void persistirExtras(Long idEvento, List<Long> idsExtras, List<String> extrasLibres) {
@@ -750,6 +789,7 @@ public class EventoPrivadoService
 
     private EventoPrivadoQuery toQuery(EventoPrivado e, ClientePerfil c, Turno t, boolean cargarDetalle) {
         List<EventoExtraQuery> extras = null;
+        List<EventoServicioQuery> servicios = null;
         List<EventoCuotaQuery> cuotas = null;
 
         if (cargarDetalle) {
@@ -767,6 +807,16 @@ public class EventoPrivadoService
                                 .nombreLibre(ex.getNombreLibre())
                                 .build();
                     }).toList();
+
+            servicios = eventoServicioRepository.findByEvento(e.getId()).stream()
+                    .map(es -> EventoServicioQuery.builder()
+                            .id(es.getId())
+                            .idServicioCotizacion(es.getIdServicioCotizacion())
+                            .idServicioVariante(es.getIdServicioVariante())
+                            .nombre(es.getNombreLibre())
+                            .precioAcordado(es.getPrecioAcordado())
+                            .build())
+                    .toList();
 
             if ("CUOTAS".equals(e.getModalidadPago())) {
                 cuotas = cuotaRepository.findByEventoId(e.getId()).stream()
@@ -821,6 +871,7 @@ public class EventoPrivadoService
                 .horaInicioReal(e.getHoraInicioReal())
                 .horaFinReal(e.getHoraFinReal())
                 .extras(extras)
+                .servicios(servicios)
                 .medioPago(fetchMedioPagoEvento(e.getId()))
                 .fechaCreacion(e.getCreatedAt())
                 .modalidadPago(e.getModalidadPago())

@@ -271,6 +271,14 @@ public class ReservaPublicaController {
         return ResponseEntity.ok(ApiResponse.ok(toResponse(reservaService.rechazarPago(id, motivo))));
     }
 
+    @PostMapping("/{id}/reembolso-no-show")
+    @PreAuthorize("hasAuthority('reserva.cancelar')")
+    public ResponseEntity<ApiResponse<ReservaPublicaResponse>> reembolsarPorNoShow(
+            @PathVariable Long id,
+            @RequestParam(required = false) String motivo) {
+        return ResponseEntity.ok(ApiResponse.ok(toResponse(reservaService.reembolsarPorNoShow(id, motivo))));
+    }
+
     @GetMapping("/{idReserva}/estado-correo")
     @PreAuthorize("hasAuthority('reserva.ver')")
     public ResponseEntity<ApiResponse<EstadoEntregaCorreoResponse>> estadoCorreo(
@@ -347,6 +355,22 @@ public class ReservaPublicaController {
         return ResponseEntity.ok(ApiResponse.ok(toDetalleResponse(q)));
     }
 
+    @PostMapping("/control-acceso/{idReserva}/revertir-ingreso")
+    @PreAuthorize("hasAuthority('reserva.editar')")
+    public ResponseEntity<ApiResponse<TicketDetalleResponse>> revertirIngreso(
+            @PathVariable Long idReserva) {
+        TicketDetalleQuery q = reservaAdminService.revertirIngreso(idReserva);
+        return ResponseEntity.ok(ApiResponse.ok(toDetalleResponse(q)));
+    }
+
+    @PostMapping("/control-acceso/{idReserva}/salida")
+    @PreAuthorize("hasAuthority('reserva.marcar_ingreso')")
+    public ResponseEntity<ApiResponse<TicketDetalleResponse>> registrarSalida(
+            @PathVariable Long idReserva) {
+        TicketDetalleQuery q = reservaAdminService.registrarSalida(idReserva);
+        return ResponseEntity.ok(ApiResponse.ok(toDetalleResponse(q)));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('reserva.cancelar')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -388,6 +412,8 @@ public class ReservaPublicaController {
                 .estado(q.getEstado())
                 .yaIngreso(q.isYaIngreso())
                 .fechaIngreso(q.getFechaIngreso())
+                .permanenciaVigente(q.isPermanenciaVigente())
+                .permanenciaFinAt(q.getPermanenciaFinAt())
                 .fechaVisita(q.getFechaVisita())
                 .esHoy(q.isEsHoy())
                 .nombreNino(q.getNombreNino())
@@ -425,6 +451,8 @@ public class ReservaPublicaController {
                 .vecesReprogramada(q.getVecesReprogramada())
                 .ingresado(q.isIngresado())
                 .fechaIngreso(q.getFechaIngreso())
+                .duracionHistoricaMinutos(q.getDuracionHistoricaMinutos())
+                .permanenciaFinAt(q.getPermanenciaFinAt())
                 .codigoQr(q.getCodigoQr())
                 .medioPago(q.getMedioPago())
                 .referenciaPago(q.getReferenciaPago())

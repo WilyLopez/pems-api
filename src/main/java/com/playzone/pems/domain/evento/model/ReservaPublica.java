@@ -45,6 +45,9 @@ public class ReservaPublica {
     private OffsetDateTime       updatedAt;
     private boolean              ingresado;
     private OffsetDateTime       ingresoAt;
+    private Integer              duracionHistoricaMinutos;
+    private OffsetDateTime       permanenciaFinAt;
+    private OffsetDateTime       salidaRealAt;
     private String               codigoQr;
     private UUID                 createdBy;
     private UUID                 updatedBy;
@@ -68,6 +71,14 @@ public class ReservaPublica {
 
     public boolean requiresVentaForEntry() {
         return ventaId == null;
+    }
+
+    public boolean estaDentroDePermanencia(OffsetDateTime ahora) {
+        return ingresado && permanenciaFinAt != null && !ahora.isAfter(permanenciaFinAt);
+    }
+
+    public boolean permanenciaVencida(OffsetDateTime ahora) {
+        return ingresado && permanenciaFinAt != null && ahora.isAfter(permanenciaFinAt);
     }
 
     public boolean totalEsCoherente() {

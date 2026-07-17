@@ -38,6 +38,9 @@ public interface ReservaPublicaJpaRepository extends JpaRepository<ReservaPublic
     List<ReservaPublicaEntity> findBySede_IdAndFechaEventoAndEstado(
             Long idSede, LocalDate fecha, EstadoReservaPublica estado);
 
+    List<ReservaPublicaEntity> findBySede_IdAndEstadoAndIngresadoFalseAndFechaEventoBefore(
+            Long idSede, EstadoReservaPublica estado, LocalDate fecha);
+
     @Query("""
             SELECT r FROM ReservaPublicaEntity r
             WHERE (CAST(:idSede AS long) IS NULL OR r.sede.id = :idSede)

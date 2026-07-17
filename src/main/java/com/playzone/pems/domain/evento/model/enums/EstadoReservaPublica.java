@@ -24,6 +24,10 @@ public enum EstadoReservaPublica {
     CANCELADA(
             "CANCELADA",
             "Reserva cancelada"
+    ),
+    VENCIDA(
+            "VENCIDA",
+            "No se presento dentro del plazo, cupo liberado automaticamente"
     );
 
     private final String codigo;
@@ -44,7 +48,7 @@ public enum EstadoReservaPublica {
             Set.of(PENDIENTE, CONFIRMADA);
 
     private static final Set<EstadoReservaPublica> REPROGRAMABLES =
-            Set.of(CONFIRMADA);
+            Set.of(CONFIRMADA, VENCIDA);
 
     public boolean esTerminal() {
         return ESTADOS_TERMINALES.contains(this);

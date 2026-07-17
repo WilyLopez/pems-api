@@ -103,6 +103,15 @@ public class ReservaPublicaEntity {
     @Column(name = "ingreso_at")
     private OffsetDateTime ingresoAt;
 
+    @Column(name = "duracion_historica_minutos")
+    private Integer duracionHistoricaMinutos;
+
+    @Column(name = "permanencia_fin_at")
+    private OffsetDateTime permanenciaFinAt;
+
+    @Column(name = "salida_real_at")
+    private OffsetDateTime salidaRealAt;
+
     @Generated(GenerationTime.INSERT)
     @Column(name = "codigo_qr", insertable = false, updatable = false, length = 200)
     private String codigoQr;
