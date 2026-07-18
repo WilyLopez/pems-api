@@ -55,7 +55,8 @@ public class RenderizadorBienvenidaStaff implements RenderizadorCorreoTransaccio
                 "correo", perfil.getCorreo() != null ? perfil.getCorreo() : "",
                 "rol", rolLabel,
                 "sede", sede != null ? sede.getNombre() : "Sede Principal",
-                "activationUrl", frontendUrl + "/auth/activar-cuenta?token=" + extraerToken(notificacion.getMetadata()));
+                "activationUrl", frontendUrl + "/auth/activar-cuenta?token=" + extraerToken(notificacion.getMetadata()),
+                "logoUrl", frontendUrl + "/logo-secundario.png");
 
         String cuerpoHtml = templateService.procesarTemplate("welcome-user", variables);
 

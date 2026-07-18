@@ -65,6 +65,8 @@ class RenderizadorBienvenidaStaffTest {
         assertTrue(resultado.getCuerpoHtml().contains("Jose Rios"));
         assertTrue(resultado.getCuerpoHtml().contains("Administrador"));
         assertTrue(resultado.getCuerpoHtml().contains("/auth/activar-cuenta?token=raw-token-123"));
+        assertTrue(resultado.getCuerpoHtml().contains("/logo-secundario.png"));
+        assertFalse(resultado.getCuerpoHtml().contains("cid:logo"));
     }
 
     @Test
