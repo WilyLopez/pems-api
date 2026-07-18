@@ -11,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -232,6 +233,24 @@ public class GlobalExceptionHandler {
             return nl > 0 ? rest.substring(0, nl).trim() : rest;
         }
         return rawMessage;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+
+        log.warn("Cuerpo de solicitud ilegible en {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .codigoError("CUERPO_INVALIDO")
+                .message("El cuerpo de la solicitud no tiene un formato válido.")
+                .path(request.getRequestURI())
+                .timestamp(Instant.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(error);
     }
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)
