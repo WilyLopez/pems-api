@@ -38,7 +38,7 @@ public class RenderizadorReservaRechazada implements RenderizadorCorreoTransacci
                 "nombreCliente", reserva.getNombreCliente() != null ? reserva.getNombreCliente() : "",
                 "numeroTicket", reserva.getNumeroTicket() != null ? reserva.getNumeroTicket() : "",
                 "motivo", extraerMotivo(notificacion.getMetadata()),
-                "urlReserva", frontendUrl + "/cliente/mis-reservas/" + reserva.getId());
+                "urlReserva", frontendUrl + "/cliente/mis-reservas?detalle=" + reserva.getId());
 
         String cuerpoHtml = templateService.procesarTemplate("email-reserva-rechazada", variables);
 

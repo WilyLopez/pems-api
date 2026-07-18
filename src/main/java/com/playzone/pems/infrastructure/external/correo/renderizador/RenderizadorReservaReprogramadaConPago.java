@@ -38,7 +38,7 @@ public class RenderizadorReservaReprogramadaConPago implements RenderizadorCorre
                 "fechaAnterior", extraerMetadata(notificacion.getMetadata(), "fechaAnterior"),
                 "fechaNueva", reserva.getFechaEvento() != null ? reserva.getFechaEvento().toString() : "",
                 "montoAdicional", extraerMetadata(notificacion.getMetadata(), "montoAdicional"),
-                "urlReserva", frontendUrl + "/cliente/mis-reservas/" + reserva.getId());
+                "urlReserva", frontendUrl + "/cliente/mis-reservas?detalle=" + reserva.getId());
 
         return ContenidoCorreo.builder()
                 .destinatario(reserva.getCorreoCliente())

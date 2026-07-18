@@ -64,7 +64,7 @@ class RenderizadorBienvenidaStaffTest {
         assertEquals("jose@correo.com", resultado.getDestinatario());
         assertTrue(resultado.getCuerpoHtml().contains("Jose Rios"));
         assertTrue(resultado.getCuerpoHtml().contains("Administrador"));
-        assertTrue(resultado.getCuerpoHtml().contains("token=raw-token-123"));
+        assertTrue(resultado.getCuerpoHtml().contains("/auth/activar-cuenta?token=raw-token-123"));
     }
 
     @Test
