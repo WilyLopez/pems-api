@@ -2,6 +2,8 @@ package com.playzone.pems.application.usuario.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.playzone.pems.application.auditoria.AuditoriaConstants;
+import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
 import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.application.usuario.dto.command.ActualizarClientePerfilCommand;
@@ -29,6 +31,8 @@ import com.playzone.pems.domain.usuario.model.PerfilUsuario;
 import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.domain.usuario.repository.ClienteTokenRepository;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
+import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
+import com.playzone.pems.shared.util.HttpRequestUtils;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.util.TokenHasher;
@@ -70,6 +74,8 @@ public class ClientePerfilService
     private final ClienteTokenRepository  clienteTokenRepository;
     private final CrearNotificacionPort   crearNotificacionPort;
     private final ObjectMapper            objectMapper;
+    private final SupabaseAuthFacade      authFacade;
+    private final RegistrarLogUseCase     auditoria;
 
     @Override
     @Transactional
@@ -437,16 +443,25 @@ public class ClientePerfilService
     @Override
     @Transactional(readOnly = true)
     public ClientePerfil ejecutar(Long id) {
-        return clientePerfilRepository.buscarPorId(id)
+        return clientePerfilRepository.buscarPorIdIncluyendoInactivos(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ClientePerfil", id));
     }
 
     @Override
     @Transactional
     public void activar(Long id) {
-        clientePerfilRepository.buscarPorId(id)
+        clientePerfilRepository.buscarPorIdIncluyendoInactivos(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ClientePerfil", id));
         clientePerfilRepository.reactivar(id);
+
+        UUID actor = authFacade.usuarioActualId().orElse(null);
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
+                actor, AuditoriaConstants.ACCION_ACTIVAR, AuditoriaConstants.MOD_CLIENTES,
+                "Cliente", id,
+                "inactivo", "activo",
+                "Cliente #" + id + " activado",
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
     }
 
     @Override
@@ -455,6 +470,15 @@ public class ClientePerfilService
         clientePerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ClientePerfil", id));
         clientePerfilRepository.desactivar(id);
+
+        UUID actor = authFacade.usuarioActualId().orElse(null);
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
+                actor, AuditoriaConstants.ACCION_DESACTIVAR, AuditoriaConstants.MOD_CLIENTES,
+                "Cliente", id,
+                "activo", "inactivo",
+                "Cliente #" + id + " desactivado",
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
     }
 
     @Override

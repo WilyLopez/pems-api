@@ -28,7 +28,7 @@ public class TestSecurityUtils {
      */
     public static void authenticateAsCliente(UUID userId, Long clientePerfilId, List<String> permisos) {
         authenticate(userId, "cliente@test.com", "authenticated", List.of("CLIENTE"),
-                permisos, clientePerfilId, null);
+                permisos, clientePerfilId, null, null);
     }
 
     /**
@@ -39,7 +39,20 @@ public class TestSecurityUtils {
      */
     public static void authenticateAsAdmin(UUID userId, List<String> permisos) {
         authenticate(userId, "admin@test.com", "authenticated", List.of("SUPERADMIN"),
-                permisos, null, 1L);
+                permisos, null, null, 1L);
+    }
+
+    /**
+     * Registra en el SecurityContext un usuario staff (CAJERO/ADMIN/SUPERADMIN) identificado
+     * por su staff_perfil.id, con permisos específicos.
+     *
+     * @param userId        UUID del usuario staff autenticado
+     * @param staffPerfilId ID del perfil de staff en la BD
+     * @param permisos      Lista de permisos concedidos
+     */
+    public static void authenticateAsStaff(UUID userId, Long staffPerfilId, List<String> permisos) {
+        authenticate(userId, "staff@test.com", "authenticated", List.of("CAJERO"),
+                permisos, null, staffPerfilId, 1L);
     }
 
     /**
@@ -51,10 +64,10 @@ public class TestSecurityUtils {
 
     private static void authenticate(UUID userId, String email, String role,
                                      List<String> roles, List<String> permisos,
-                                     Long clientePerfilId, Long sedeId) {
+                                     Long clientePerfilId, Long staffPerfilId, Long sedeId) {
         SupabaseAuthContext ctx = new SupabaseAuthContext(
                 userId, email, role, roles, permisos,
-                clientePerfilId, sedeId,
+                clientePerfilId, staffPerfilId, sedeId,
                 System.currentTimeMillis() + 3_600_000L
         );
 

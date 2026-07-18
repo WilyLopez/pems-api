@@ -164,7 +164,7 @@ class ClienteControllerSecurityTest {
         TestSecurityUtils.authenticateAsCliente(CLIENTE_UUID, otroClienteId,
                 List.of("cliente.editar"));
 
-        // @PreAuthorize exige que #id == @supabaseAuthFacade.clientePerfilId() OR usuario.gestionar
+        // @PreAuthorize exige que #id == @supabaseAuthFacade.clientePerfilId() OR usuarios.gestionar
         // Como el context tiene clientePerfilId=99 != 42, debe ser 403
         mockMvc.perform(put("/api/v1/clientes/" + CLIENTE_ID + "/foto"))
                 .andExpect(status().isForbidden());

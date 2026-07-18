@@ -56,7 +56,7 @@ class AuthServiceTest {
     void testCambiarPasswordDeStaffNotificaCambioPassword() {
         UUID usuarioId = UUID.randomUUID();
         SupabaseAuthContext ctx = new SupabaseAuthContext(
-                usuarioId, "staff@correo.com", "authenticated", List.of("CAJERO"), List.of(), null, 1L, 0L);
+                usuarioId, "staff@correo.com", "authenticated", List.of("CAJERO"), List.of(), null, 1L, 1L, 0L);
         when(supabaseAuthFacade.contextoActual()).thenReturn(Optional.of(ctx));
         when(staffPerfilRepository.buscarPorUsuarioId(usuarioId)).thenReturn(Optional.of(
                 StaffPerfil.builder().id(1L).usuarioId(usuarioId).debeCambiarContrasena(true).build()));
@@ -75,7 +75,7 @@ class AuthServiceTest {
     void testCambiarPasswordDeClienteNotificaCambioPassword() {
         UUID usuarioId = UUID.randomUUID();
         SupabaseAuthContext ctx = new SupabaseAuthContext(
-                usuarioId, "cliente@correo.com", "authenticated", List.of("CLIENTE"), List.of(), 5L, null, 0L);
+                usuarioId, "cliente@correo.com", "authenticated", List.of("CLIENTE"), List.of(), 5L, null, null, 0L);
         when(supabaseAuthFacade.contextoActual()).thenReturn(Optional.of(ctx));
         when(staffPerfilRepository.buscarPorUsuarioId(usuarioId)).thenReturn(Optional.empty());
         when(clientePerfilRepository.buscarPorUsuarioId(usuarioId)).thenReturn(Optional.of(

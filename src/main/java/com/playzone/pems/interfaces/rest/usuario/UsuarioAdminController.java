@@ -4,7 +4,6 @@ import com.playzone.pems.application.usuario.dto.command.RegistrarUsuarioAdminCo
 import com.playzone.pems.application.usuario.dto.response.UsuarioAdminResponse;
 import com.playzone.pems.application.usuario.port.in.ActivarUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.ActualizarUsuarioAdminUseCase;
-import com.playzone.pems.application.usuario.port.in.CambiarPasswordMeUseCase;
 import com.playzone.pems.application.usuario.port.in.CambiarRolUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.DesactivarUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.DesbloquearUsuarioAdminUseCase;
@@ -14,12 +13,10 @@ import com.playzone.pems.application.usuario.port.in.RegistrarUsuarioAdminUseCas
 import com.playzone.pems.application.usuario.port.in.ResetPasswordAdminUseCase;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.interfaces.rest.usuario.request.ActualizarUsuarioAdminRequest;
-import com.playzone.pems.interfaces.rest.usuario.request.CambiarContrasenaAdminRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.CambiarRolRequest;
 import com.playzone.pems.interfaces.rest.usuario.request.RegistrarUsuarioAdminRequest;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.response.ApiResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,7 +41,6 @@ public class UsuarioAdminController {
     private final ActivarUsuarioAdminUseCase     activarUseCase;
     private final DesactivarUsuarioAdminUseCase  desactivarUseCase;
     private final DesbloquearUsuarioAdminUseCase desbloquearUseCase;
-    private final CambiarPasswordMeUseCase       cambiarPasswordMeUseCase;
     private final SupabaseAuthFacade             authFacade;
 
     @GetMapping
@@ -54,7 +50,7 @@ public class UsuarioAdminController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('usuarios.ver') or #id == @supabaseAuthFacade.staffPerfilId().orElse(-1L)")
     public ResponseEntity<ApiResponse<UsuarioAdminResponse>> obtener(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(obtenerUseCase.ejecutar(id)));
     }
@@ -78,29 +74,13 @@ public class UsuarioAdminController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('usuarios.editar') or #id == @supabaseAuthFacade.staffPerfilId().orElse(-1L)")
     public ResponseEntity<ApiResponse<UsuarioAdminResponse>> actualizar(
             @PathVariable Long id,
             @Valid @RequestBody ActualizarUsuarioAdminRequest request) {
 
         UsuarioAdminResponse response = actualizarUseCase.ejecutar(id, request.getNombre(), request.getTelefono());
         return ResponseEntity.ok(ApiResponse.ok(response));
-    }
-
-    @PutMapping("/{id}/contrasena")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> cambiarContrasena(
-            @PathVariable Long id,
-            @Valid @RequestBody CambiarContrasenaAdminRequest request,
-            HttpServletRequest servletRequest) {
-
-        String authHeader = servletRequest.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Token no proporcionado"));
-        }
-        cambiarPasswordMeUseCase.ejecutar(authHeader.substring(7), request.getContrasenaActual(), request.getContrasenaNueva());
-        return ResponseEntity.ok(ApiResponse.noContent());
     }
 
     @PatchMapping("/{id}/rol")

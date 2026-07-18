@@ -42,6 +42,7 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
             List<String> roles,
             List<String> permisos,
             Long clientePerfilId,
+            Long staffPerfilId,
             Long sedeId,
             boolean debeCambiarPassword,
             boolean esActivo,
@@ -146,7 +147,7 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
 
         SupabaseAuthContext ctx = new SupabaseAuthContext(
                 userId, email, role, auth.roles(), auth.permisos(), auth.clientePerfilId(),
-                auth.sedeId(), expiresAt
+                auth.staffPerfilId(), auth.sedeId(), expiresAt
         );
 
         UsernamePasswordAuthenticationToken authentication =
@@ -171,14 +172,17 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
 
         List<String> roles    = usuarioRolRepository.listarCodigosRolPorUsuario(userId);
         List<String> permisos = usuarioRolRepository.listarCodigosPermisoPorUsuario(userId);
-        Long clientePerfilId  = clientePerfilRepository.buscarPorUsuarioId(userId)
-                .map(cp -> cp.getId())
+        java.util.Optional<com.playzone.pems.domain.usuario.model.ClientePerfil> cliente =
+                clientePerfilRepository.buscarPorUsuarioIdIncluyendoInactivos(userId);
+        Long clientePerfilId = cliente.filter(cp -> cp.getDeletedAt() == null)
+                .map(com.playzone.pems.domain.usuario.model.ClientePerfil::getId)
                 .orElse(null);
 
         boolean debeCambiarPassword = false;
-        boolean esActivo             = true;
+        boolean esActivo             = cliente.isEmpty() || cliente.get().getDeletedAt() == null;
         boolean estaBloqueado       = false;
         Long    sedeId               = null;
+        Long    staffPerfilId       = null;
 
         java.util.Optional<com.playzone.pems.domain.usuario.model.StaffPerfil> staff = staffPerfilRepository.buscarPorUsuarioId(userId);
         if (staff.isPresent()) {
@@ -187,9 +191,10 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
             estaBloqueado       = staff.get().getBloqueadoHasta() != null
                     && staff.get().getBloqueadoHasta().isAfter(java.time.OffsetDateTime.now());
             sedeId               = staff.get().getSedeId();
+            staffPerfilId       = staff.get().getId();
         }
 
-        CachedAuthorities fresh = new CachedAuthorities(roles, permisos, clientePerfilId, sedeId,
+        CachedAuthorities fresh = new CachedAuthorities(roles, permisos, clientePerfilId, staffPerfilId, sedeId,
                 debeCambiarPassword, esActivo, estaBloqueado,
                 System.currentTimeMillis());
 

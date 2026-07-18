@@ -24,25 +24,33 @@ public class AuditoriaService implements RegistrarLogUseCase {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void ejecutar(Command command) {
         try {
-            LogAuditoria logAuditoria = LogAuditoria.builder()
-                    .idUsuarioAdmin(command.idUsuarioAdmin())
-                    .accion(command.accion())
-                    .modulo(command.modulo())
-                    .entidadAfectada(command.entidadAfectada())
-                    .idEntidad(command.idEntidad())
-                    .valorAnterior(toJson(command.valorAnterior()))
-                    .valorNuevo(toJson(command.valorNuevo()))
-                    .descripcion(command.descripcion())
-                    .ipOrigen(command.ipOrigen())
-                    .userAgent(command.userAgent())
-                    .nivel(command.nivel())
-                    .resultado(command.resultado())
-                    .build();
-
-            logRepository.save(logAuditoria);
+            logRepository.save(construir(command));
         } catch (Exception e) {
             log.error("Error al registrar log de auditoría: {}", e.getMessage(), e);
         }
+    }
+
+    @Override
+    @Transactional
+    public void ejecutarSincrono(Command command) {
+        logRepository.save(construir(command));
+    }
+
+    private LogAuditoria construir(Command command) {
+        return LogAuditoria.builder()
+                .idUsuarioAdmin(command.idUsuarioAdmin())
+                .accion(command.accion())
+                .modulo(command.modulo())
+                .entidadAfectada(command.entidadAfectada())
+                .idEntidad(command.idEntidad())
+                .valorAnterior(toJson(command.valorAnterior()))
+                .valorNuevo(toJson(command.valorNuevo()))
+                .descripcion(command.descripcion())
+                .ipOrigen(command.ipOrigen())
+                .userAgent(command.userAgent())
+                .nivel(command.nivel())
+                .resultado(command.resultado())
+                .build();
     }
 
     private String toJson(Object obj) {

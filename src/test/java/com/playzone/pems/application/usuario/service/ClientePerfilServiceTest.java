@@ -1,6 +1,7 @@
 package com.playzone.pems.application.usuario.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
 import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.application.usuario.dto.command.ActualizarClientePerfilCommand;
@@ -12,6 +13,7 @@ import com.playzone.pems.domain.usuario.model.ClienteToken;
 import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
 import com.playzone.pems.domain.usuario.repository.ClienteTokenRepository;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
+import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.util.TokenHasher;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +40,8 @@ class ClientePerfilServiceTest {
     @Mock private SupabaseAuthPort supabaseAuthPort;
     @Mock private ClienteTokenRepository clienteTokenRepository;
     @Mock private CrearNotificacionPort crearNotificacionPort;
+    @Mock private SupabaseAuthFacade authFacade;
+    @Mock private RegistrarLogUseCase auditoria;
 
     private ClientePerfilService clientePerfilService;
 
@@ -47,7 +51,8 @@ class ClientePerfilServiceTest {
     void setUp() {
         clientePerfilService = new ClientePerfilService(
                 clientePerfilRepository, perfilUsuarioRepository, supabaseAuthPort,
-                clienteTokenRepository, crearNotificacionPort, new ObjectMapper());
+                clienteTokenRepository, crearNotificacionPort, new ObjectMapper(),
+                authFacade, auditoria);
 
         command = RegistrarClientePublicoCommand.builder()
                 .nombre("Juan Perez")
@@ -353,5 +358,70 @@ class ClientePerfilServiceTest {
 
         assertThrows(ValidationException.class, () -> clientePerfilService.confirmar(10L, "token-correo"));
         verify(clientePerfilRepository, never()).guardar(any());
+    }
+
+    @Test
+    void testObtenerUnClienteDesactivadoFunciona() {
+        ClientePerfil clienteDesactivado = ClientePerfil.builder().id(9L)
+                .deletedAt(OffsetDateTime.now()).build();
+        when(clientePerfilRepository.buscarPorIdIncluyendoInactivos(9L))
+                .thenReturn(Optional.of(clienteDesactivado));
+
+        ClientePerfil resultado = clientePerfilService.ejecutar(9L);
+
+        assertEquals(9L, resultado.getId());
+    }
+
+    @Test
+    void testDesactivarRegistraAuditoria() {
+        ClientePerfil cliente = ClientePerfil.builder().id(7L).build();
+        when(clientePerfilRepository.buscarPorId(7L)).thenReturn(Optional.of(cliente));
+        when(authFacade.usuarioActualId()).thenReturn(Optional.empty());
+
+        clientePerfilService.desactivar(7L);
+
+        verify(clientePerfilRepository).desactivar(7L);
+        ArgumentCaptor<RegistrarLogUseCase.Command> captor = ArgumentCaptor.forClass(RegistrarLogUseCase.Command.class);
+        verify(auditoria).ejecutarSincrono(captor.capture());
+        assertEquals("DESACTIVAR", captor.getValue().accion());
+        assertEquals(7L, captor.getValue().idEntidad());
+        assertEquals("Cliente", captor.getValue().entidadAfectada());
+    }
+
+    @Test
+    void testDesactivarConClienteInexistenteLanzaResourceNotFoundException() {
+        when(clientePerfilRepository.buscarPorId(99L)).thenReturn(Optional.empty());
+
+        assertThrows(com.playzone.pems.shared.exception.ResourceNotFoundException.class,
+                () -> clientePerfilService.desactivar(99L));
+        verify(clientePerfilRepository, never()).desactivar(anyLong());
+        verify(auditoria, never()).ejecutarSincrono(any());
+    }
+
+    @Test
+    void testActivarUnClienteYaDesactivadoFunciona() {
+        ClientePerfil clienteDesactivado = ClientePerfil.builder().id(8L)
+                .deletedAt(OffsetDateTime.now()).build();
+        when(clientePerfilRepository.buscarPorIdIncluyendoInactivos(8L))
+                .thenReturn(Optional.of(clienteDesactivado));
+        when(authFacade.usuarioActualId()).thenReturn(Optional.empty());
+
+        clientePerfilService.activar(8L);
+
+        verify(clientePerfilRepository).reactivar(8L);
+        ArgumentCaptor<RegistrarLogUseCase.Command> captor = ArgumentCaptor.forClass(RegistrarLogUseCase.Command.class);
+        verify(auditoria).ejecutarSincrono(captor.capture());
+        assertEquals("ACTIVAR", captor.getValue().accion());
+        assertEquals(8L, captor.getValue().idEntidad());
+    }
+
+    @Test
+    void testActivarConClienteInexistenteLanzaResourceNotFoundException() {
+        when(clientePerfilRepository.buscarPorIdIncluyendoInactivos(99L)).thenReturn(Optional.empty());
+
+        assertThrows(com.playzone.pems.shared.exception.ResourceNotFoundException.class,
+                () -> clientePerfilService.activar(99L));
+        verify(clientePerfilRepository, never()).reactivar(anyLong());
+        verify(auditoria, never()).ejecutarSincrono(any());
     }
 }

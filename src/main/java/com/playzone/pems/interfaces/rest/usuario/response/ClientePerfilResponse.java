@@ -23,6 +23,7 @@ public class ClientePerfilResponse {
     private String         correo;
     private String         telefono;
     private LocalDate      fechaNacimiento;
+    private boolean        activo;
     private boolean        esVip;
     private BigDecimal     descuentoVip;
     private int            contadorVisitas;

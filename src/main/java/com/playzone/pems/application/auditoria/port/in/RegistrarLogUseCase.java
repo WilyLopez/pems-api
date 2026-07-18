@@ -27,4 +27,6 @@ public interface RegistrarLogUseCase {
     }
 
     void ejecutar(Command command);
+
+    void ejecutarSincrono(Command command);
 }

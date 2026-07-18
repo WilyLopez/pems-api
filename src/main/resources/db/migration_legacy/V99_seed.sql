@@ -85,8 +85,7 @@ INSERT INTO permiso (codigo, modulo, nombre, descripcion, orden) VALUES
     ('comprobante.anular',      'facturacion','Anular comprobante',           'Emitir nota de crédito',                   112),
 
     -- Sistema
-    ('usuario.ver',             'usuario',    'Ver usuarios',                 'Listar cuentas',                           120),
-    ('usuario.gestionar',       'usuario',    'Gestionar usuarios',           'CRUD cuentas y roles',                     121),
+    ('usuarios.gestionar',      'usuario',    'Gestionar usuarios',           'CRUD cuentas y roles',                     121),
     ('rol.gestionar',           'usuario',    'Gestionar roles',              'Asignar roles y permisos',                 122),
     ('configuracion.editar',    'sistema',    'Editar configuración',         'Configuración global/sede',                123),
     ('auditoria.ver',           'sistema',    'Ver auditoría',                'Log de auditoría',                         124),

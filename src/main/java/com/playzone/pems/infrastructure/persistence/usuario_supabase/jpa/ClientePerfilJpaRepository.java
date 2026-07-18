@@ -18,6 +18,8 @@ public interface ClientePerfilJpaRepository extends JpaRepository<ClientePerfilE
 
     Optional<ClientePerfilEntity> findByUsuarioIdAndDeletedAtIsNull(UUID usuarioId);
 
+    Optional<ClientePerfilEntity> findByUsuarioId(UUID usuarioId);
+
     Optional<ClientePerfilEntity> findByIdAndDeletedAtIsNull(Long id);
 
     Optional<ClientePerfilEntity> findByCorreoAndDeletedAtIsNull(String correo);

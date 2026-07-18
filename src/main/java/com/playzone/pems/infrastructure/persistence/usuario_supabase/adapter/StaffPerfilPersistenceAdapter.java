@@ -18,12 +18,12 @@ public class StaffPerfilPersistenceAdapter implements StaffPerfilRepository {
 
     @Override
     public Optional<StaffPerfil> buscarPorId(Long id) {
-        return jpa.findByIdAndDeletedAtIsNull(id).map(this::toDomain);
+        return jpa.findById(id).map(this::toDomain);
     }
 
     @Override
     public Optional<StaffPerfil> buscarPorUsuarioId(UUID usuarioId) {
-        return jpa.findByUsuarioIdAndDeletedAtIsNull(usuarioId).map(this::toDomain);
+        return jpa.findByUsuarioId(usuarioId).map(this::toDomain);
     }
 
     @Override
@@ -33,7 +33,7 @@ public class StaffPerfilPersistenceAdapter implements StaffPerfilRepository {
 
     @Override
     public java.util.List<StaffPerfil> listarTodos() {
-        return jpa.findByDeletedAtIsNull().stream().map(this::toDomain).toList();
+        return jpa.findAll().stream().map(this::toDomain).toList();
     }
 
     @Override
@@ -53,7 +53,6 @@ public class StaffPerfilPersistenceAdapter implements StaffPerfilRepository {
         entity.setBloqueadoHasta(domain.getBloqueadoHasta());
         entity.setCreatedBy(domain.getCreatedBy());
         entity.setUpdatedBy(domain.getUpdatedBy());
-        entity.setDeletedAt(domain.getDeletedAt());
 
         return toDomain(jpa.save(entity));
     }
@@ -85,7 +84,6 @@ public class StaffPerfilPersistenceAdapter implements StaffPerfilRepository {
                 .updatedAt(e.getUpdatedAt())
                 .createdBy(e.getCreatedBy())
                 .updatedBy(e.getUpdatedBy())
-                .deletedAt(e.getDeletedAt())
                 .build();
     }
 }

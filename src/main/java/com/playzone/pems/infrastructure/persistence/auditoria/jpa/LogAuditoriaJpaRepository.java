@@ -17,6 +17,9 @@ public interface LogAuditoriaJpaRepository extends JpaRepository<LogAuditoriaEnt
     Page<LogAuditoriaEntity> findByModuloAndEntidadAfectadaOrderByFechaLogDesc(
             String modulo, String entidad, Pageable pageable);
 
+    Page<LogAuditoriaEntity> findByEntidadAfectadaAndIdEntidadOrderByFechaLogDesc(
+            String entidadAfectada, Long idEntidad, Pageable pageable);
+
     Page<LogAuditoriaEntity> findByFechaLogBetweenOrderByFechaLogDesc(
             OffsetDateTime desde, OffsetDateTime hasta, Pageable pageable);
 
