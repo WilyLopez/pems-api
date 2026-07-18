@@ -54,7 +54,7 @@ class RenderizadorReservaRechazadaTest {
 
         assertFalse(resultado.getCuerpoHtml().contains("<script>alert(1)</script>"));
         assertTrue(resultado.getCuerpoHtml().contains("&lt;script&gt;"));
-        assertTrue(resultado.getCuerpoHtml().contains("https://kikiylala.lat/cliente/mis-reservas/300"));
+        assertTrue(resultado.getCuerpoHtml().contains("https://kikiylala.lat/cliente/mis-reservas?detalle=300"));
     }
 
     @Test

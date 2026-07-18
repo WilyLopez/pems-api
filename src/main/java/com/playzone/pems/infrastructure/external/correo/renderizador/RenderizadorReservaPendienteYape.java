@@ -34,7 +34,7 @@ public class RenderizadorReservaPendienteYape implements RenderizadorCorreoTrans
                 "numeroTicket", reserva.getNumeroTicket() != null ? reserva.getNumeroTicket() : "",
                 "fecha", reserva.getFechaEvento() != null ? reserva.getFechaEvento().toString() : "",
                 "total", reserva.getTotalPagado() != null ? reserva.getTotalPagado().toPlainString() : "0.00",
-                "urlReserva", frontendUrl + "/cliente/mis-reservas/" + reserva.getId());
+                "urlReserva", frontendUrl + "/cliente/mis-reservas?detalle=" + reserva.getId());
 
         String cuerpoHtml = templateService.procesarTemplate("email-reserva-pendiente-yape", variables);
 
