@@ -32,6 +32,7 @@ import com.playzone.pems.domain.usuario.repository.UsuarioRolRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
+import com.playzone.pems.shared.util.HttpRequestUtils;
 import com.playzone.pems.shared.util.TokenHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -91,13 +93,18 @@ public class StaffService implements
     @Transactional(readOnly = true)
     public List<UsuarioAdminResponse> ejecutar() {
         List<StaffPerfil> staffList = staffPerfilRepository.listarTodos();
-        List<UsuarioAdminResponse> response = new ArrayList<>();
+        List<UUID> usuarioIds = staffList.stream().map(StaffPerfil::getUsuarioId).toList();
 
+        Map<UUID, PerfilUsuario> perfilesPorUsuario = perfilUsuarioRepository.buscarPorIds(usuarioIds).stream()
+                .collect(Collectors.toMap(PerfilUsuario::getId, p -> p));
+        Map<UUID, List<String>> rolesPorUsuario = usuarioRolRepository.listarCodigosRolPorUsuarios(usuarioIds);
+
+        List<UsuarioAdminResponse> response = new ArrayList<>();
         for (StaffPerfil staff : staffList) {
-            PerfilUsuario perfil = perfilUsuarioRepository.buscarPorId(staff.getUsuarioId()).orElse(null);
+            PerfilUsuario perfil = perfilesPorUsuario.get(staff.getUsuarioId());
             if (perfil == null) continue;
             Sede sede = sedeRepository.findById(staff.getSedeId()).orElse(null);
-            List<String> roles = usuarioRolRepository.listarCodigosRolPorUsuario(staff.getUsuarioId());
+            List<String> roles = rolesPorUsuario.getOrDefault(staff.getUsuarioId(), List.of());
             response.add(buildResponse(staff, perfil, sede, roles));
         }
         return response;
@@ -162,23 +169,26 @@ public class StaffService implements
                 .rolCodigo(rol)
                 .build());
 
+        UUID actor = authFacade.usuarioActualId().orElse(null);
         StaffPerfil staff = staffPerfilRepository.guardar(StaffPerfil.builder()
                 .usuarioId(usuarioId)
                 .sedeId(command.getSedeId())
                 .esActivo(true)
                 .debeCambiarContrasena(true)
                 .intentosFallidos(0)
+                .createdBy(actor)
+                .updatedBy(actor)
                 .build());
 
         enviarNotificacionActivacion(usuarioId, staff.getId());
 
-        UUID actor = authFacade.usuarioActualId().orElse(null);
-        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
                 actor, AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_USUARIOS,
                 "Staff", staff.getId(),
                 null, correoNorm + " | rol=" + rol,
                 "Usuario creado: " + command.getNombre() + " (" + correoNorm + ")",
-                null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
 
         return UsuarioAdminResponse.builder()
                 .id(staff.getId())
@@ -239,7 +249,18 @@ public class StaffService implements
         supabaseAuthPort.establecerPasswordAdmin(staffToken.getUsuarioId(), nuevaContrasena);
 
         staffTokenRepository.guardar(staffToken.toBuilder().usadoAt(OffsetDateTime.now()).build());
-        staffPerfilRepository.guardar(staff.toBuilder().debeCambiarContrasena(false).build());
+        staffPerfilRepository.guardar(staff.toBuilder()
+                .debeCambiarContrasena(false)
+                .updatedBy(staffToken.getUsuarioId())
+                .build());
+
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
+                staffToken.getUsuarioId(), AuditoriaConstants.ACCION_ACTIVAR_CUENTA, AuditoriaConstants.MOD_USUARIOS,
+                "Staff", staff.getId(),
+                null, null,
+                "Cuenta activada por el propio usuario para staff #" + staff.getId(),
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
     }
 
 
@@ -249,15 +270,18 @@ public class StaffService implements
         StaffPerfil staff = staffPerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("StaffPerfil", id));
 
+        UUID actor = authFacade.usuarioActualId().orElse(null);
+        validarJerarquiaGestion(actor, staff.getUsuarioId(), false);
+
         perfilUsuarioRepository.actualizarPerfil(staff.getUsuarioId(), nombre, telefono);
 
-        UUID actor = authFacade.usuarioActualId().orElse(null);
-        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
                 actor, AuditoriaConstants.ACCION_ACTUALIZAR, AuditoriaConstants.MOD_USUARIOS,
                 "Staff", id,
                 null, "nombre=" + nombre,
                 "Perfil actualizado para staff #" + id,
-                null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
 
         PerfilUsuario perfil = perfilUsuarioRepository.buscarPorId(staff.getUsuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("PerfilUsuario", "usuarioId", staff.getUsuarioId()));
@@ -289,16 +313,10 @@ public class StaffService implements
         StaffPerfil staff = staffPerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("StaffPerfil", id));
 
-        if (staff.getUsuarioId().equals(solicitanteId)) {
-            throw new ValidationException("id", "No puedes cambiar tu propio rol.");
-        }
+        validarJerarquiaGestion(solicitanteId, staff.getUsuarioId(), true);
 
         List<String> rolesActuales = usuarioRolRepository.listarCodigosRolPorUsuario(staff.getUsuarioId());
         String rolActual = rolesActuales.isEmpty() ? "" : rolesActuales.get(0);
-
-        if (rolActual.equals(SUPERADMIN)) {
-            throw new ValidationException("id", "No se puede cambiar el rol de un SUPERADMIN.");
-        }
 
         if (!rolNorm.equals(rolActual)) {
             validarLimiteRol(rolNorm, id);
@@ -312,12 +330,13 @@ public class StaffService implements
                 .rolCodigo(rolNorm)
                 .build());
 
-        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
                 solicitanteId, AuditoriaConstants.ACCION_ACTUALIZAR, AuditoriaConstants.MOD_USUARIOS,
                 "Staff", id,
                 rolActual, rolNorm,
                 "Cambio de rol: " + rolActual + " → " + rolNorm + " para staff #" + id,
-                null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
 
         PerfilUsuario perfil = perfilUsuarioRepository.buscarPorId(staff.getUsuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("PerfilUsuario", "usuarioId", staff.getUsuarioId()));
@@ -333,10 +352,14 @@ public class StaffService implements
 
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void resetear(Long id) {
         StaffPerfil staff = staffPerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("StaffPerfil", id));
+
+        UUID actor = authFacade.usuarioActualId().orElse(null);
+        validarJerarquiaGestion(actor, staff.getUsuarioId(), true);
+
         if (!staff.isEsActivo()) {
             throw new ValidationException("id",
                     "No se puede restablecer la contraseña de un usuario inactivo.");
@@ -344,6 +367,14 @@ public class StaffService implements
         PerfilUsuario perfil = perfilUsuarioRepository.buscarPorId(staff.getUsuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("PerfilUsuario", "usuarioId", staff.getUsuarioId()));
         supabaseAuthPort.recuperarPassword(perfil.getCorreo());
+
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
+                actor, AuditoriaConstants.ACCION_RESETEAR_PASSWORD, AuditoriaConstants.MOD_USUARIOS,
+                "Staff", id,
+                null, null,
+                "Reseteo de contraseña solicitado para staff #" + id,
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
     }
 
 
@@ -353,19 +384,28 @@ public class StaffService implements
     public void activar(Long id) {
         StaffPerfil staff = staffPerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("StaffPerfil", id));
+
+        UUID actor = authFacade.usuarioActualId().orElse(null);
+        validarJerarquiaGestion(actor, staff.getUsuarioId(), true);
+
+        List<String> roles = usuarioRolRepository.listarCodigosRolPorUsuario(staff.getUsuarioId());
+        String rol = roles.isEmpty() ? "" : roles.get(0);
+        validarLimiteRol(rol, -1L);
+
         staffPerfilRepository.guardar(staff.toBuilder()
                 .esActivo(true)
                 .bloqueadoHasta(null)
                 .intentosFallidos(0)
+                .updatedBy(actor)
                 .build());
 
-        UUID actor = authFacade.usuarioActualId().orElse(null);
-        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
                 actor, AuditoriaConstants.ACCION_ACTIVAR, AuditoriaConstants.MOD_USUARIOS,
                 "Staff", id,
                 "inactivo", "activo",
                 "Usuario staff #" + id + " activado",
-                null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
     }
 
     @Override
@@ -374,21 +414,24 @@ public class StaffService implements
         StaffPerfil staff = staffPerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("StaffPerfil", id));
 
+        UUID actor = authFacade.usuarioActualId().orElse(null);
+        validarJerarquiaGestion(actor, staff.getUsuarioId(), true);
+
         List<String> roles = usuarioRolRepository.listarCodigosRolPorUsuario(staff.getUsuarioId());
         if (roles.contains(ADMIN) && staffPerfilRepository.contarActivosPorRol(ADMIN) <= 1) {
             throw new ValidationException("id",
                     "No se puede desactivar al único administrador activo del sistema.");
         }
 
-        staffPerfilRepository.guardar(staff.toBuilder().esActivo(false).build());
+        staffPerfilRepository.guardar(staff.toBuilder().esActivo(false).updatedBy(actor).build());
 
-        UUID actor = authFacade.usuarioActualId().orElse(null);
-        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
                 actor, AuditoriaConstants.ACCION_DESACTIVAR, AuditoriaConstants.MOD_USUARIOS,
                 "Staff", id,
                 "activo", "inactivo",
                 "Usuario staff #" + id + " desactivado",
-                null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
 
         notificarSeguridadStaff("USUARIO_BLOQUEADO", staff.getUsuarioId(), Map.of(
                 "nombre", nombreStaff(staff.getUsuarioId()),
@@ -401,18 +444,23 @@ public class StaffService implements
     public void desbloquear(Long id) {
         StaffPerfil staff = staffPerfilRepository.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("StaffPerfil", id));
+
+        UUID actor = authFacade.usuarioActualId().orElse(null);
+        validarJerarquiaGestion(actor, staff.getUsuarioId(), true);
+
         staffPerfilRepository.guardar(staff.toBuilder()
                 .bloqueadoHasta(null)
                 .intentosFallidos(0)
+                .updatedBy(actor)
                 .build());
 
-        UUID actor = authFacade.usuarioActualId().orElse(null);
-        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+        auditoria.ejecutarSincrono(new RegistrarLogUseCase.Command(
                 actor, AuditoriaConstants.ACCION_ACTUALIZAR, AuditoriaConstants.MOD_USUARIOS,
                 "Staff", id,
                 "bloqueado", "desbloqueado",
                 "Cuenta desbloqueada manualmente para staff #" + id,
-                null, null, AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
+                HttpRequestUtils.ipActual(), HttpRequestUtils.userAgentActual(),
+                AuditoriaConstants.NIVEL_WARNING, AuditoriaConstants.RESULTADO_EXITOSO));
 
         notificarSeguridadStaff("USUARIO_DESBLOQUEADO", staff.getUsuarioId(), Map.of(
                 "nombre", nombreStaff(staff.getUsuarioId())));
@@ -438,6 +486,26 @@ public class StaffService implements
                     .destinatarioUsuarioId(adminId)
                     .datosExtra(datosExtra)
                     .build());
+        }
+    }
+
+    private void validarJerarquiaGestion(UUID actorId, UUID objetivoUsuarioId, boolean bloquearAutoAccion) {
+        if (actorId == null) {
+            throw new ValidationException("auth", "No se pudo identificar al solicitante.");
+        }
+        if (actorId.equals(objetivoUsuarioId)) {
+            if (bloquearAutoAccion) {
+                throw new ValidationException("id", "No puedes ejecutar esta acción sobre tu propia cuenta.");
+            }
+            return;
+        }
+        List<String> rolesActor = usuarioRolRepository.listarCodigosRolPorUsuario(actorId);
+        if (rolesActor.contains(SUPERADMIN)) {
+            return;
+        }
+        List<String> rolesObjetivo = usuarioRolRepository.listarCodigosRolPorUsuario(objetivoUsuarioId);
+        if (rolesObjetivo.contains(SUPERADMIN) || rolesObjetivo.contains(ADMIN)) {
+            throw new ValidationException("id", "No tienes permisos suficientes para gestionar esta cuenta.");
         }
     }
 

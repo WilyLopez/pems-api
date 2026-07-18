@@ -242,13 +242,13 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('cliente.ver') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuario.gestionar'))")
+    @PreAuthorize("hasAuthority('cliente.ver') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuarios.gestionar'))")
     public ResponseEntity<ApiResponse<ClientePerfilResponse>> obtener(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(toResponse(obtenerUseCase.ejecutar(id))));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('cliente.editar') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuario.gestionar'))")
+    @PreAuthorize("hasAuthority('cliente.editar') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuarios.gestionar'))")
     public ResponseEntity<ApiResponse<ClientePerfilResponse>> actualizar(
             @PathVariable Long id,
             @Valid @RequestBody ActualizarClientePerfilRequest request) {
@@ -317,7 +317,7 @@ public class ClienteController {
     }
 
     @PutMapping("/{id}/foto")
-    @PreAuthorize("hasAuthority('cliente.editar') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuario.gestionar'))")
+    @PreAuthorize("hasAuthority('cliente.editar') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuarios.gestionar'))")
     public ResponseEntity<ApiResponse<ClientePerfilResponse>> subirFoto(
             @PathVariable Long id,
             @RequestPart("foto") MultipartFile foto) {
@@ -353,7 +353,7 @@ public class ClienteController {
     }
 
     @DeleteMapping("/{id}/foto")
-    @PreAuthorize("hasAuthority('cliente.editar') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuario.gestionar'))")
+    @PreAuthorize("hasAuthority('cliente.editar') and (#id == @supabaseAuthFacade.clientePerfilId().orElse(-1L) or hasAuthority('usuarios.gestionar'))")
     public ResponseEntity<ApiResponse<ClientePerfilResponse>> eliminarFoto(@PathVariable Long id) {
         ClientePerfil perfil = obtenerUseCase.ejecutar(id);
 
@@ -382,6 +382,7 @@ public class ClienteController {
                 .correo(p.getCorreo())
                 .telefono(p.getTelefono())
                 .fechaNacimiento(p.getFechaNacimiento())
+                .activo(p.getDeletedAt() == null)
                 .esVip(p.isEsVip())
                 .descuentoVip(p.getDescuentoVip())
                 .contadorVisitas(p.getContadorVisitas())

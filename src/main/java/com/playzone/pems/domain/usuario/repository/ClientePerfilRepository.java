@@ -16,7 +16,11 @@ public interface ClientePerfilRepository {
 
     Optional<ClientePerfil> buscarPorUsuarioId(UUID usuarioId);
 
+    Optional<ClientePerfil> buscarPorUsuarioIdIncluyendoInactivos(UUID usuarioId);
+
     Optional<ClientePerfil> buscarPorId(Long id);
+
+    Optional<ClientePerfil> buscarPorIdIncluyendoInactivos(Long id);
 
     Optional<ClientePerfil> buscarPorCorreo(String correo);
 

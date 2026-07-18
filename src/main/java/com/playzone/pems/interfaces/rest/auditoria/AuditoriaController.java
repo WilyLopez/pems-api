@@ -68,6 +68,20 @@ public class AuditoriaController {
         return ResponseEntity.ok(ApiResponse.ok(PagedResponse.of(page)));
     }
 
+    @GetMapping("/entidad/{entidad}/{idEntidad}")
+    @PreAuthorize("hasAuthority('auditoria.ver')")
+    public ResponseEntity<ApiResponse<PagedResponse<LogAuditoriaResponse>>> listarPorEntidad(
+            @PathVariable String entidad,
+            @PathVariable Long idEntidad,
+            @RequestParam(defaultValue = "0")  int pagina,
+            @RequestParam(defaultValue = "20") int tamano) {
+
+        Page<LogAuditoriaResponse> page = obtenerAuditoria.listarPorEntidad(entidad, idEntidad, pagina, tamano)
+                .map(this::toResponse);
+
+        return ResponseEntity.ok(ApiResponse.ok(PagedResponse.of(page)));
+    }
+
     private LogAuditoriaResponse toResponse(com.playzone.pems.domain.auditoria.model.LogAuditoria log) {
         return LogAuditoriaResponse.builder()
                 .id(log.getId())

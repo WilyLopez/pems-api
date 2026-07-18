@@ -29,5 +29,4 @@ public class StaffPerfil {
     private java.time.OffsetDateTime updatedAt;
     private java.util.UUID createdBy;
     private java.util.UUID updatedBy;
-    private java.time.OffsetDateTime deletedAt;
 }

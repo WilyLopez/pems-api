@@ -26,4 +26,6 @@ public interface ObtenerAuditoriaUseCase {
     LogAuditoria obtenerPorId(Long id);
 
     Page<LogAuditoria> listarPorUsuario(UUID idUsuario, int pagina, int tamano);
+
+    Page<LogAuditoria> listarPorEntidad(String entidadAfectada, Long idEntidad, int pagina, int tamano);
 }

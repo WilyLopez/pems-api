@@ -8,18 +8,14 @@ import java.util.UUID;
 
 public interface StaffPerfilJpaRepository extends JpaRepository<StaffPerfilEntity, Long> {
 
-    Optional<StaffPerfilEntity> findByUsuarioIdAndDeletedAtIsNull(UUID usuarioId);
+    Optional<StaffPerfilEntity> findByUsuarioId(UUID usuarioId);
 
     @org.springframework.data.jpa.repository.Query("""
             SELECT s FROM StaffPerfilEntity s
             JOIN PerfilUsuarioEntity p ON s.usuarioId = p.id
-            WHERE p.correo = :correo AND s.deletedAt IS NULL
+            WHERE p.correo = :correo
             """)
     Optional<StaffPerfilEntity> findByCorreo(@org.springframework.data.repository.query.Param("correo") String correo);
-
-    Optional<StaffPerfilEntity> findByIdAndDeletedAtIsNull(Long id);
-
-    java.util.List<StaffPerfilEntity> findByDeletedAtIsNull();
 
     @org.springframework.data.jpa.repository.Query(value = """
             SELECT COUNT(sp.id)
@@ -27,7 +23,6 @@ public interface StaffPerfilJpaRepository extends JpaRepository<StaffPerfilEntit
             INNER JOIN usuario_rol ur ON sp.usuario_id = ur.usuario_id
             WHERE ur.rol_codigo = :rolCodigo
               AND sp.es_activo = true
-              AND sp.deleted_at IS NULL
             """, nativeQuery = true)
     long contarActivosPorRol(@org.springframework.data.repository.query.Param("rolCodigo") String rolCodigo);
 
@@ -37,7 +32,6 @@ public interface StaffPerfilJpaRepository extends JpaRepository<StaffPerfilEntit
             INNER JOIN usuario_rol ur ON sp.usuario_id = ur.usuario_id
             WHERE ur.rol_codigo = :rolCodigo
               AND sp.es_activo = true
-              AND sp.deleted_at IS NULL
               AND sp.id <> :excludeId
             """, nativeQuery = true)
     long contarActivosPorRolExcluyendo(
@@ -50,7 +44,6 @@ public interface StaffPerfilJpaRepository extends JpaRepository<StaffPerfilEntit
             INNER JOIN usuario_rol ur ON sp.usuario_id = ur.usuario_id
             WHERE ur.rol_codigo IN ('SUPERADMIN', 'ADMIN')
               AND sp.es_activo = true
-              AND sp.deleted_at IS NULL
             """, nativeQuery = true)
     java.util.List<UUID> obtenerAdministradoresActivos();
 }

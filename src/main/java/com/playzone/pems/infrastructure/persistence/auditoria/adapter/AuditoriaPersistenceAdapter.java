@@ -77,6 +77,13 @@ public class AuditoriaPersistenceAdapter implements LogAuditoriaRepository {
     }
 
     @Override
+    public Page<LogAuditoria> findByEntidad(String entidadAfectada, Long idEntidad, Pageable pageable) {
+        Page<LogAuditoriaEntity> page = logJpa.findByEntidadAfectadaAndIdEntidadOrderByFechaLogDesc(entidadAfectada, idEntidad, pageable);
+        Map<UUID, String> nombres = cargarNombres(page.getContent());
+        return page.map(e -> toDomain(e, nombres));
+    }
+
+    @Override
     public Page<LogAuditoria> findByFechasBetween(LocalDateTime desde, LocalDateTime hasta, Pageable pageable) {
         Page<LogAuditoriaEntity> page = logJpa.findByFechaLogBetweenOrderByFechaLogDesc(
                 toOffsetDateTime(desde), toOffsetDateTime(hasta), pageable);

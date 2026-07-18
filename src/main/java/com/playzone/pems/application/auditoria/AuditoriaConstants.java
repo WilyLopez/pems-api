@@ -7,6 +7,7 @@ public final class AuditoriaConstants {
     // ── Módulos ──────────────────────────────────────────────────────────────
     public static final String MOD_ACCESOS       = "ACCESOS";
     public static final String MOD_USUARIOS      = "USUARIOS";
+    public static final String MOD_CLIENTES      = "CLIENTES";
     public static final String MOD_CONTRATOS     = "CONTRATOS";
     public static final String MOD_VENTAS        = "VENTAS";
     public static final String MOD_FACTURACION   = "FACTURACION";
@@ -44,6 +45,8 @@ public final class AuditoriaConstants {
     public static final String ACCION_DESACTIVAR    = "DESACTIVAR";
     public static final String ACCION_RESPONDER     = "RESPONDER";
     public static final String ACCION_MARCAR_SPAM   = "MARCAR_SPAM";
+    public static final String ACCION_RESETEAR_PASSWORD = "RESETEAR_PASSWORD";
+    public static final String ACCION_ACTIVAR_CUENTA    = "ACTIVAR_CUENTA";
 
     // ── Niveles ──────────────────────────────────────────────────────────────
     public static final String NIVEL_INFO     = "INFO";

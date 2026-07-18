@@ -54,4 +54,12 @@ public class ObtenerAuditoriaService implements ObtenerAuditoriaUseCase {
                 idUsuario,
                 PaginacionUtil.construir(pagina, tamano, "fechaLog", "desc"));
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<LogAuditoria> listarPorEntidad(String entidadAfectada, Long idEntidad, int pagina, int tamano) {
+        return logRepository.findByEntidad(
+                entidadAfectada, idEntidad,
+                PaginacionUtil.construir(pagina, tamano, "fechaLog", "desc"));
+    }
 }

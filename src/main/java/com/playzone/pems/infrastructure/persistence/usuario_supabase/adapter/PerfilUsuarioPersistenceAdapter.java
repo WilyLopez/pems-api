@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,11 @@ public class PerfilUsuarioPersistenceAdapter implements PerfilUsuarioRepository 
     @Override
     public Optional<PerfilUsuario> buscarPorId(UUID id) {
         return jpa.findByIdAndDeletedAtIsNull(id).map(this::toDomain);
+    }
+
+    @Override
+    public List<PerfilUsuario> buscarPorIds(List<UUID> ids) {
+        return jpa.findByIdInAndDeletedAtIsNull(ids).stream().map(this::toDomain).toList();
     }
 
     @Override

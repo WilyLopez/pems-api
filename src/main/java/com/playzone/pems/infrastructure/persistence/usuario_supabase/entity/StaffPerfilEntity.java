@@ -80,8 +80,4 @@ public class StaffPerfilEntity {
     @Setter
     @Column(name = "updated_by", columnDefinition = "uuid")
     private UUID updatedBy;
-
-    @Setter
-    @Column(name = "deleted_at")
-    private OffsetDateTime deletedAt;
 }

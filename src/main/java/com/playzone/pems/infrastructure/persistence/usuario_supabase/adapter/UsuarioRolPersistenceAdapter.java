@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -17,6 +19,15 @@ public class UsuarioRolPersistenceAdapter implements UsuarioRolRepository {
     @Override
     public List<String> listarCodigosRolPorUsuario(UUID usuarioId) {
         return jpa.findRolCodigosByUsuarioId(usuarioId);
+    }
+
+    @Override
+    public Map<UUID, List<String>> listarCodigosRolPorUsuarios(List<UUID> usuarioIds) {
+        return jpa.findRolCodigosByUsuarioIds(usuarioIds).stream()
+                .collect(Collectors.groupingBy(
+                        UsuarioRolJpaRepository.RolPorUsuarioProjection::getUsuarioId,
+                        Collectors.mapping(UsuarioRolJpaRepository.RolPorUsuarioProjection::getRolCodigo, Collectors.toList())
+                ));
     }
 
     @Override

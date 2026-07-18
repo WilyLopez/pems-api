@@ -19,6 +19,9 @@ public interface LogAuditoriaRepository {
     Page<LogAuditoria> findByModuloAndEntidad(
             String modulo, String entidad, Pageable pageable);
 
+    Page<LogAuditoria> findByEntidad(
+            String entidadAfectada, Long idEntidad, Pageable pageable);
+
     Page<LogAuditoria> findByFechasBetween(
             LocalDateTime desde, LocalDateTime hasta, Pageable pageable);
 

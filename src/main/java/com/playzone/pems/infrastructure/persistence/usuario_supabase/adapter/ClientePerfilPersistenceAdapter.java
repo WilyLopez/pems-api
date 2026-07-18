@@ -30,8 +30,18 @@ public class ClientePerfilPersistenceAdapter implements ClientePerfilRepository 
     }
 
     @Override
+    public Optional<ClientePerfil> buscarPorUsuarioIdIncluyendoInactivos(UUID usuarioId) {
+        return jpa.findByUsuarioId(usuarioId).map(this::toDomain);
+    }
+
+    @Override
     public Optional<ClientePerfil> buscarPorId(Long id) {
         return jpa.findByIdAndDeletedAtIsNull(id).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<ClientePerfil> buscarPorIdIncluyendoInactivos(Long id) {
+        return jpa.findById(id).map(this::toDomain);
     }
 
     @Override
