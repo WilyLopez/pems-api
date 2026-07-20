@@ -79,6 +79,41 @@ class SolicitudEventoPrivadoValidatorTest {
     }
 
     @Test
+    void testDescripcionAusenteEnCotizacionPersonalizadaEsRechazada() {
+        SolicitudEventoPrivadoValidator validator = crearValidator();
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> validator.validarDescripcionPersonalizada(true, null));
+
+        assertEquals("descripcionPersonalizada", ex.getCampo());
+    }
+
+    @Test
+    void testDescripcionCortaEnCotizacionPersonalizadaEsRechazada() {
+        SolicitudEventoPrivadoValidator validator = crearValidator();
+
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> validator.validarDescripcionPersonalizada(true, "Muy corta"));
+
+        assertEquals("descripcionPersonalizada", ex.getCampo());
+    }
+
+    @Test
+    void testDescripcionDeTreintaCaracteresEnCotizacionPersonalizadaEsValida() {
+        SolicitudEventoPrivadoValidator validator = crearValidator();
+
+        assertDoesNotThrow(() -> validator.validarDescripcionPersonalizada(
+                true, "Descripcion con treinta caracteres"));
+    }
+
+    @Test
+    void testDescripcionAusenteFueraDeCotizacionPersonalizadaEsValida() {
+        SolicitudEventoPrivadoValidator validator = crearValidator();
+
+        assertDoesNotThrow(() -> validator.validarDescripcionPersonalizada(false, null));
+    }
+
+    @Test
     void testTurnoOcupadoIndicaElCampoIdTurno() {
         SolicitudEventoPrivadoValidator validator = crearValidator();
         Turno turno = Turno.builder().id(1L).codigo("T1").build();

@@ -42,7 +42,7 @@ public class SolicitarEventoPrivadoRequest {
 
     private Long         idPaquete;
     private List<Long>   idsExtras;
-    private List<String> extrasLibres;
+    private List<@Size(max = 500) String> extrasLibres;
 
     @Size(max = 2000)
     private String observaciones;

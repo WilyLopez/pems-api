@@ -73,6 +73,7 @@ public class EventoPrivadoCicloVidaService
         solicitudValidator.validarTurnoEvento(command.getIdSede(), command.getFechaEvento(), command.getIdTurno());
         solicitudValidator.validarAforoYEdad(command.getIdSede(), command.getAforoDeclarado(), command.getEdadCumple());
         solicitudValidator.validarNombreYEdad(command.getNombreNino(), command.getEdadCumple());
+        solicitudValidator.validarDescripcionPersonalizada(command.isEsCotizacionPersonalizada(), command.getDescripcionPersonalizada());
 
         EventoPrivado evento = EventoPrivado.builder()
                 .idCliente(command.getIdCliente())
