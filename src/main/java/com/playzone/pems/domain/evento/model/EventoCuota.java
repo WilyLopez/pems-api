@@ -1,5 +1,6 @@
 package com.playzone.pems.domain.evento.model;
 
+import com.playzone.pems.domain.evento.model.enums.EstadoCuota;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,11 +21,11 @@ public class EventoCuota {
     private int           numeroCuota;
     private BigDecimal    monto;
     private LocalDate     fechaVencimiento;
-    private String        estado;        // PENDIENTE | PAGADO | VENCIDO
+    private EstadoCuota   estado;
     private Long          ventaId;
     private OffsetDateTime createdAt;
 
-    public boolean esPagado()    { return "PAGADO".equals(estado); }
-    public boolean esPendiente() { return "PENDIENTE".equals(estado); }
-    public boolean esVencido()   { return "VENCIDO".equals(estado); }
+    public boolean esPagado()    { return estado == EstadoCuota.PAGADO; }
+    public boolean esPendiente() { return estado == EstadoCuota.PENDIENTE; }
+    public boolean esVencido()   { return estado == EstadoCuota.VENCIDO; }
 }

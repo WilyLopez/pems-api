@@ -60,10 +60,6 @@ public class EventoPrivadoPersistenceAdapter implements EventoPrivadoRepository 
         return eventoJpa.findBySede_IdAndFechaEvento(idSede, fecha).stream().map(mapper::toDomain).toList();
     }
 
-    @Override public boolean existsActivoBySedeAndFechaAndTurno(Long idSede, LocalDate fecha, Long idTurno) {
-        return eventoJpa.existsActivoBySedeAndFechaAndTurno(idSede, fecha, idTurno);
-    }
-
     @Override public boolean existsActivoBySedeAndFechaAndCodigoTurno(Long idSede, LocalDate fecha, String codigoTurno) {
         return eventoJpa.existsActivoBySedeAndFechaAndCodigoTurno(idSede, fecha, codigoTurno);
     }
@@ -92,10 +88,8 @@ public class EventoPrivadoPersistenceAdapter implements EventoPrivadoRepository 
     public EventoPrivado save(EventoPrivado evento) {
         var sede = sedeJpa.findById(evento.getIdSede())
                 .orElseThrow(() -> new ResourceNotFoundException("Sede", evento.getIdSede()));
-        Long idTurno = evento.getIdTurno();
-        String codigoTurno = idTurno == 1L ? "T1" : idTurno == 2L ? "T2" : String.valueOf(idTurno);
-        var turno = turnoJpa.findById(codigoTurno)
-                .orElseThrow(() -> new ResourceNotFoundException("Turno", idTurno));
+        var turno = turnoJpa.buscarPorIdNumerico(evento.getIdTurno())
+                .orElseThrow(() -> new ResourceNotFoundException("Turno", evento.getIdTurno()));
 
         return mapper.toDomain(eventoJpa.save(mapper.toEntity(evento, sede, turno)));
     }

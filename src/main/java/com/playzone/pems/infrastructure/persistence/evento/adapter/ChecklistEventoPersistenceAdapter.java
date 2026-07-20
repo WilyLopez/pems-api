@@ -7,28 +7,24 @@ import com.playzone.pems.infrastructure.persistence.evento.entity.EventoPrivadoE
 import com.playzone.pems.infrastructure.persistence.evento.jpa.ChecklistEventoJpaRepository;
 import com.playzone.pems.infrastructure.persistence.evento.jpa.EventoPrivadoJpaRepository;
 import com.playzone.pems.infrastructure.persistence.evento.mapper.ChecklistEventoEntityMapper;
+import com.playzone.pems.infrastructure.persistence.usuario_supabase.entity.PerfilUsuarioEntity;
 import com.playzone.pems.infrastructure.persistence.usuario_supabase.jpa.PerfilUsuarioJpaRepository;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class ChecklistEventoPersistenceAdapter implements ChecklistEventoRepository {
-
-    private static final List<String> TAREAS_BASE = Arrays.asList(
-        "Decoracion lista",
-        "Sonido instalado",
-        "Animador confirmado",
-        "Catering preparado",
-        "Personal asignado",
-        "Area limpia y habilitada"
-    );
 
     private final ChecklistEventoJpaRepository checklistJpa;
     private final EventoPrivadoJpaRepository   eventoJpa;
@@ -42,8 +38,22 @@ public class ChecklistEventoPersistenceAdapter implements ChecklistEventoReposit
 
     @Override
     public List<ChecklistEvento> findByEventoOrdenado(Long idEvento) {
-        return checklistJpa.findByEventoPrivado_IdOrderByOrdenAsc(idEvento)
-                .stream().map(mapper::toDomain).map(this::enriquecer).toList();
+        List<ChecklistEvento> items = checklistJpa.findByEventoPrivado_IdOrderByOrdenAsc(idEvento)
+                .stream().map(mapper::toDomain).toList();
+        if (items.isEmpty()) return items;
+
+        List<UUID> idsUsuarios = items.stream()
+                .map(ChecklistEvento::getIdUsuarioCompleto)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<UUID, String> nombresPorId = perfilJpa.findAllById(idsUsuarios).stream()
+                .collect(Collectors.toMap(PerfilUsuarioEntity::getId, PerfilUsuarioEntity::getNombreCompleto));
+
+        return items.stream()
+                .map(item -> item.getIdUsuarioCompleto() == null ? item
+                        : item.toBuilder().nombreUsuarioCompleto(nombresPorId.get(item.getIdUsuarioCompleto())).build())
+                .toList();
     }
 
     @Override
@@ -62,16 +72,18 @@ public class ChecklistEventoPersistenceAdapter implements ChecklistEventoReposit
 
     @Override
     @Transactional
-    public void crearTareasBase(Long idEvento) {
+    public void crearTareasBase(Long idEvento, List<String> tareas) {
         EventoPrivadoEntity evento = eventoJpa.findById(idEvento)
                 .orElseThrow(() -> new ResourceNotFoundException("EventoPrivado", idEvento));
-        for (int i = 0; i < TAREAS_BASE.size(); i++) {
-            checklistJpa.save(ChecklistEventoEntity.builder()
+        List<ChecklistEventoEntity> entidades = new ArrayList<>();
+        for (int i = 0; i < tareas.size(); i++) {
+            entidades.add(ChecklistEventoEntity.builder()
                     .eventoPrivado(evento)
-                    .tarea(TAREAS_BASE.get(i))
+                    .tarea(tareas.get(i))
                     .orden(i + 1)
                     .build());
         }
+        checklistJpa.saveAll(entidades);
     }
 
     private ChecklistEvento enriquecer(ChecklistEvento d) {

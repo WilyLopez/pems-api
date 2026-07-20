@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "evento_extra")
@@ -32,7 +32,14 @@ public class EventoExtraEntity {
     @Column(name = "nombre_libre", length = 300)
     private String nombreLibre;
 
+    @Column(name = "cantidad", nullable = false)
+    @Builder.Default
+    private int cantidad = 1;
+
+    @Column(name = "notas", columnDefinition = "TEXT")
+    private String notas;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime fechaCreacion;
+    private OffsetDateTime fechaCreacion;
 }

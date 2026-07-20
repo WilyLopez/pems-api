@@ -9,6 +9,6 @@ public interface ChecklistEventoRepository {
     Optional<ChecklistEvento> findById(Long id);
     List<ChecklistEvento> findByEventoOrdenado(Long idEvento);
     ChecklistEvento save(ChecklistEvento checklist);
-    void crearTareasBase(Long idEvento);
+    void crearTareasBase(Long idEvento, List<String> tareas);
     void deleteById(Long id);
 }

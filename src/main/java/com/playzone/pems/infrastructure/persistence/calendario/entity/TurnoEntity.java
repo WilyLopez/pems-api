@@ -18,6 +18,9 @@ public class TurnoEntity {
     @Column(nullable = false, length = 10)
     private String codigo;
 
+    @Column(name = "id", nullable = false, unique = true)
+    private Long id;
+
     @Column(nullable = false, name = "nombre", length = 60)
     private String descripcion;
 
@@ -26,10 +29,6 @@ public class TurnoEntity {
 
     @Column(name = "hora_fin", nullable = false)
     private LocalTime horaFin;
-
-    public Long getId() {
-        return "T1".equals(codigo) ? 1L : "T2".equals(codigo) ? 2L : null;
-    }
 
     public String getNombre() {
         return descripcion;

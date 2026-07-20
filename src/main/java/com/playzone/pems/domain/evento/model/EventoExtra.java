@@ -15,4 +15,7 @@ public class EventoExtra {
     private Long   idEventoPrivado;
     private Long   idExtra;
     private String nombreLibre;
+    @Builder.Default
+    private int    cantidad = 1;
+    private String notas;
 }

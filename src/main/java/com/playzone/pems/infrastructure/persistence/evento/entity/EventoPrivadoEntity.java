@@ -1,6 +1,7 @@
 package com.playzone.pems.infrastructure.persistence.evento.entity;
 
 import com.playzone.pems.domain.evento.model.enums.EstadoEventoPrivado;
+import com.playzone.pems.domain.evento.model.enums.ModalidadPago;
 import com.playzone.pems.infrastructure.persistence.calendario.entity.TurnoEntity;
 import com.playzone.pems.infrastructure.persistence.comercial.entity.TipoEventoEntity;
 import com.playzone.pems.infrastructure.persistence.usuario.entity.SedeEntity;
@@ -129,9 +130,10 @@ public class EventoPrivadoEntity {
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "modalidad_pago", nullable = false, length = 20)
     @Builder.Default
-    private String modalidadPago = "AL_CONTADO";
+    private ModalidadPago modalidadPago = ModalidadPago.AL_CONTADO;
 
     @Column(name = "fecha_limite_pago")
     private LocalDate fechaLimitePago;

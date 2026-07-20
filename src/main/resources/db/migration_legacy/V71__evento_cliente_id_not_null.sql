@@ -1,0 +1,1 @@
+ALTER TABLE evento ALTER COLUMN cliente_id SET NOT NULL;

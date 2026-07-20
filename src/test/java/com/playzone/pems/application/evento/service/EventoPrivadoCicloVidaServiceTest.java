@@ -1,11 +1,9 @@
 package com.playzone.pems.application.evento.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playzone.pems.application.auditoria.port.in.RegistrarLogUseCase;
 import com.playzone.pems.application.evento.dto.command.ConfirmarEventoCommand;
-import com.playzone.pems.application.evento.dto.command.RegistrarPagoCuotaCommand;
-import com.playzone.pems.application.evento.dto.command.RegistrarSaldoCommand;
 import com.playzone.pems.application.evento.dto.command.SolicitarEventoPrivadoCommand;
+import com.playzone.pems.application.evento.dto.command.VentaPagoItem;
 import com.playzone.pems.application.evento.port.out.EnviarNotificacionEventoPort;
 import com.playzone.pems.application.finanzas.service.EnrutadorCajaService;
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
@@ -26,12 +24,13 @@ import com.playzone.pems.domain.comercial.repository.TipoEventoRepository;
 import com.playzone.pems.domain.evento.model.EventoCuota;
 import com.playzone.pems.domain.evento.model.EventoPrivado;
 import com.playzone.pems.domain.evento.model.EventoServicio;
+import com.playzone.pems.domain.evento.model.enums.EstadoCuota;
 import com.playzone.pems.domain.evento.model.enums.EstadoEventoPrivado;
 import com.playzone.pems.domain.evento.repository.ChecklistEventoRepository;
 import com.playzone.pems.domain.evento.repository.EventoCuotaRepository;
 import com.playzone.pems.domain.evento.repository.EventoExtraRepository;
-import com.playzone.pems.domain.evento.repository.EventoServicioRepository;
 import com.playzone.pems.domain.evento.repository.EventoPrivadoRepository;
+import com.playzone.pems.domain.evento.repository.EventoServicioRepository;
 import com.playzone.pems.domain.evento.repository.ReservaPublicaRepository;
 import com.playzone.pems.domain.usuario.model.ClientePerfil;
 import com.playzone.pems.domain.usuario.repository.ClientePerfilRepository;
@@ -48,6 +47,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -58,11 +58,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class EventoPrivadoServiceTest {
+class EventoPrivadoCicloVidaServiceTest {
 
     @Mock private EventoPrivadoRepository eventoRepository;
     @Mock private ReservaPublicaRepository reservaRepository;
@@ -89,17 +88,27 @@ class EventoPrivadoServiceTest {
     @Mock private CrearNotificacionPort crearNotificacionPort;
     @Mock private SedeScopeValidator sedeScope;
 
-    private EventoPrivadoService service;
+    private EventoPrivadoCicloVidaService service;
 
     @BeforeEach
     void setUp() {
-        service = new EventoPrivadoService(
-                eventoRepository, reservaRepository, clientePerfilRepository, bloqueRepository,
-                feriadoRepository, turnoRepository, configRepository, notificacionPort,
-                eventoExtraRepository, eventoServicioRepository, ventaRepository, ventaPagoRepository, supabaseAuthFacade,
-                extraPaqueteRepository, servicioCotizacionRepository, servicioVarianteRepository, tipoEventoRepository,
-                cuotaRepository, checklistRepository, perfilUsuarioRepository, enrutadorCajaService,
-                auditoria, crearNotificacionPort, sedeScope, new ObjectMapper());
+        EventoPrivadoQueryMapper mapper = new EventoPrivadoQueryMapper(
+                eventoRepository, clientePerfilRepository, turnoRepository,
+                eventoExtraRepository, eventoServicioRepository, cuotaRepository,
+                extraPaqueteRepository, perfilUsuarioRepository, ventaRepository, ventaPagoRepository);
+        EventoAccesoValidator accesoValidator = new EventoAccesoValidator(supabaseAuthFacade, sedeScope);
+        VentaEventoWriter ventaWriter = new VentaEventoWriter(ventaRepository, ventaPagoRepository, enrutadorCajaService);
+        SolicitudEventoPrivadoValidator solicitudValidator = new SolicitudEventoPrivadoValidator(
+                tipoEventoRepository, configRepository, supabaseAuthFacade, feriadoRepository,
+                bloqueRepository, reservaRepository, eventoRepository, turnoRepository);
+        EventoServicioExtraWriter extraWriter = new EventoServicioExtraWriter(
+                servicioCotizacionRepository, servicioVarianteRepository, eventoServicioRepository, eventoExtraRepository);
+        EventoCuotaGenerator cuotaGenerator = new EventoCuotaGenerator(cuotaRepository);
+
+        service = new EventoPrivadoCicloVidaService(
+                eventoRepository, notificacionPort, checklistRepository, supabaseAuthFacade,
+                auditoria, crearNotificacionPort, sedeScope, accesoValidator, mapper, ventaWriter,
+                solicitudValidator, extraWriter, cuotaGenerator);
     }
 
     private ClientePerfil clientePrueba() {
@@ -113,7 +122,7 @@ class EventoPrivadoServiceTest {
 
     @Test
     void testSolicitarEventoNotificaTransaccionalPresupuestoEnviado() {
-        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
         when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
                 Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
@@ -144,7 +153,7 @@ class EventoPrivadoServiceTest {
 
     @Test
     void testSolicitarEventoConServiciosPersisteEventoServicioConPrecioCongelado() {
-        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
         when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
                 Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
@@ -182,7 +191,7 @@ class EventoPrivadoServiceTest {
 
     @Test
     void testSolicitarEventoSinServiciosNoPersisteEventoServicio() {
-        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
         when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
                 Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
@@ -207,8 +216,79 @@ class EventoPrivadoServiceTest {
     }
 
     @Test
+    void testSolicitarEventoConAforoMayorAlConfiguradoParaLaSedeLanzaValidationException() {
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
+        when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
+                Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .diasMinEventoPrivado(1).diasMaxEventoPrivado(365)
+                .aforoMaximo(60).edadMinCumple(0).edadMaxCumple(18).build());
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .aforoDeclarado(61)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.ejecutar(comando));
+        assertTrue(ex.getMessage().toLowerCase().contains("aforo"));
+        verify(eventoRepository, never()).save(any());
+    }
+
+    @Test
+    void testSolicitarEventoConAforoSuperiorA60PeroDentroDelConfiguradoParaLaSedeNoLanzaExcepcion() {
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
+        when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
+                Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .diasMinEventoPrivado(1).diasMaxEventoPrivado(365)
+                .aforoMaximo(100).edadMinCumple(0).edadMaxCumple(18).build());
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+        when(eventoRepository.save(any())).thenAnswer(inv -> {
+            EventoPrivado arg = inv.getArgument(0);
+            return arg.toBuilder().id(200L).build();
+        });
+        when(clientePerfilRepository.buscarPorId(5L)).thenReturn(Optional.of(clientePrueba()));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .aforoDeclarado(80)
+                .build();
+
+        service.ejecutar(comando);
+
+        verify(eventoRepository).save(any());
+    }
+
+    @Test
+    void testSolicitarEventoConEdadCumpleFueraDelRangoConfiguradoParaLaSedeLanzaValidationException() {
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
+        when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
+                Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .diasMinEventoPrivado(1).diasMaxEventoPrivado(365)
+                .aforoMaximo(60).edadMinCumple(1).edadMaxCumple(15).build());
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .edadCumple(16)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.ejecutar(comando));
+        assertTrue(ex.getMessage().toLowerCase().contains("edad"));
+        verify(eventoRepository, never()).save(any());
+    }
+
+    @Test
     void testSolicitarEventoConVarianteSeleccionadaPersistePrecioDeLaVariante() {
-        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
         when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
                 Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
@@ -247,7 +327,7 @@ class EventoPrivadoServiceTest {
 
     @Test
     void testSolicitarEventoConServicioConVariantesSinSeleccionarLanzaValidationException() {
-        when(supabaseAuthFacade.tieneRol(anyString())).thenReturn(true);
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(false);
         when(tipoEventoRepository.buscarPorCodigo("CUMPLEANOS")).thenReturn(
                 Optional.of(TipoEvento.builder().codigo("CUMPLEANOS").activo(true).build()));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
@@ -323,7 +403,7 @@ class EventoPrivadoServiceTest {
                 .idEvento(301L).precioTotal(new BigDecimal("500.00"))
                 .montoAdelanto(new BigDecimal("200.00"))
                 .idUsuarioGestor(gestorId)
-                .pagosAdelanto(List.of(com.playzone.pems.application.evento.dto.command.VentaPagoItem.builder()
+                .pagosAdelanto(List.of(VentaPagoItem.builder()
                         .medioPagoCodigo("YAPE").monto(new BigDecimal("200.00")).build()))
                 .build();
 
@@ -346,86 +426,94 @@ class EventoPrivadoServiceTest {
     }
 
     @Test
-    void testRegistrarPagoCuotaNotificaAbonoAlClienteYSaldoAlGestor() {
-        UUID gestorId = UUID.randomUUID();
-        EventoCuota cuota = EventoCuota.builder()
-                .id(1L).eventoId(500L).numeroCuota(2).monto(new BigDecimal("100.00")).estado("PENDIENTE").build();
+    void testConfirmarEventoConCuotasYSinAdelantoGeneraCuotasQueSumanElPrecioTotal() {
         EventoPrivado evento = EventoPrivado.builder()
-                .id(500L).idCliente(5L).idSede(1L).idTurno(1L).idUsuarioGestor(gestorId)
-                .estado(EstadoEventoPrivado.CONFIRMADA)
-                .fechaEvento(LocalDate.now().plusMonths(1))
-                .tipoEvento("CUMPLEANOS")
-                .precioContrato(new BigDecimal("500.00"))
-                .montoAdelanto(new BigDecimal("200.00"))
+                .id(900L).idCliente(5L).idSede(1L).idTurno(1L)
+                .estado(EstadoEventoPrivado.SOLICITADA)
+                .fechaEvento(LocalDate.now().plusMonths(2))
+                .montoAdelanto(BigDecimal.ZERO)
                 .build();
-        when(cuotaRepository.findById(1L)).thenReturn(Optional.of(cuota));
-        when(eventoRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(evento));
-        when(ventaRepository.save(any())).thenAnswer(inv -> {
-            Venta arg = inv.getArgument(0);
-            return arg.toBuilder().id(401L).build();
-        });
-        when(cuotaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(eventoRepository.findById(900L)).thenReturn(Optional.of(evento));
         when(eventoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(clientePerfilRepository.buscarPorId(5L)).thenReturn(Optional.of(clientePrueba()));
         when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
 
-        RegistrarPagoCuotaCommand comando = RegistrarPagoCuotaCommand.builder()
-                .idCuota(1L)
-                .pagos(List.of(com.playzone.pems.application.evento.dto.command.VentaPagoItem.builder()
-                        .medioPagoCodigo("EFECTIVO").monto(new BigDecimal("100.00")).build()))
-                .idUsuario(gestorId)
+        ConfirmarEventoCommand comando = ConfirmarEventoCommand.builder()
+                .idEvento(900L).precioTotal(new BigDecimal("300.00"))
+                .montoAdelanto(BigDecimal.ZERO).pagosAdelanto(List.of())
+                .modalidadPago("CUOTAS").numeroCuotas(3)
+                .fechaLimitePago(LocalDate.now().plusMonths(1))
                 .build();
 
         service.ejecutar(comando);
 
-        ArgumentCaptor<CrearNotificacionCommand> captor = ArgumentCaptor.forClass(CrearNotificacionCommand.class);
-        verify(crearNotificacionPort, times(2)).notificarTransaccional(captor.capture());
-        List<CrearNotificacionCommand> comandos = captor.getAllValues();
+        ArgumentCaptor<List<EventoCuota>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cuotaRepository).saveAll(captor.capture());
+        List<EventoCuota> cuotas = captor.getValue();
 
-        CrearNotificacionCommand gestorCmd = comandos.stream()
-                .filter(c -> "EVENTO_SALDO_RECIBIDO".equals(c.getTipoCodigo())).findFirst().orElseThrow();
-        assertEquals(gestorId, gestorCmd.getDestinatarioUsuarioId());
-
-        CrearNotificacionCommand clienteCmd = comandos.stream()
-                .filter(c -> "EVENTO_ABONO_RECIBIDO".equals(c.getTipoCodigo())).findFirst().orElseThrow();
-        assertEquals(5L, clienteCmd.getDestinatarioClienteId());
-        assertTrue(clienteCmd.getMetadata().contains("montoAbonado"));
+        assertEquals(3, cuotas.size());
+        BigDecimal total = cuotas.stream().map(EventoCuota::getMonto).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, new BigDecimal("300.00").compareTo(total));
+        assertTrue(cuotas.stream().allMatch(c -> c.getMonto().compareTo(BigDecimal.ZERO) > 0));
+        assertTrue(cuotas.stream().allMatch(c -> c.getEstado() == EstadoCuota.PENDIENTE));
+        assertTrue(cuotas.stream().allMatch(c -> c.getVentaId() == null));
+        assertEquals(List.of(1, 2, 3), cuotas.stream().map(EventoCuota::getNumeroCuota).sorted().toList());
     }
 
     @Test
-    void testRegistrarSaldoNotificaAbonoAlClienteYSaldoAlGestor() {
-        UUID gestorId = UUID.randomUUID();
+    void testConfirmarEventoConCuotasYConAdelantoGeneraCuotasQueSumanElPrecioTotal() {
         EventoPrivado evento = EventoPrivado.builder()
-                .id(600L).idCliente(5L).idSede(1L).idTurno(1L).idUsuarioGestor(gestorId)
-                .estado(EstadoEventoPrivado.CONFIRMADA)
-                .fechaEvento(LocalDate.now().plusMonths(1))
-                .tipoEvento("CUMPLEANOS")
-                .precioContrato(new BigDecimal("500.00"))
-                .montoAdelanto(new BigDecimal("200.00"))
+                .id(901L).idCliente(5L).idSede(1L).idTurno(1L)
+                .estado(EstadoEventoPrivado.SOLICITADA)
+                .fechaEvento(LocalDate.now().plusMonths(2))
+                .montoAdelanto(BigDecimal.ZERO)
                 .build();
-        when(eventoRepository.findByIdForUpdate(600L)).thenReturn(Optional.of(evento));
-        when(ventaRepository.save(any())).thenAnswer(inv -> {
-            Venta arg = inv.getArgument(0);
-            return arg.toBuilder().id(402L).build();
-        });
+        when(eventoRepository.findById(901L)).thenReturn(Optional.of(evento));
         when(eventoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(clientePerfilRepository.buscarPorId(5L)).thenReturn(Optional.of(clientePrueba()));
         when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoPrueba()));
+        when(ventaRepository.save(any())).thenAnswer(inv -> {
+            Venta arg = inv.getArgument(0);
+            return arg.toBuilder().id(410L).build();
+        });
 
-        RegistrarSaldoCommand comando = RegistrarSaldoCommand.builder()
-                .idEvento(600L).monto(new BigDecimal("300.00")).medioPago("TARJETA").idUsuario(gestorId)
+        ConfirmarEventoCommand comando = ConfirmarEventoCommand.builder()
+                .idEvento(901L).precioTotal(new BigDecimal("300.00"))
+                .montoAdelanto(new BigDecimal("60.00"))
+                .pagosAdelanto(List.of(VentaPagoItem.builder().medioPagoCodigo("YAPE").monto(new BigDecimal("60.00")).build()))
+                .modalidadPago("CUOTAS").numeroCuotas(3)
+                .fechaLimitePago(LocalDate.now().plusMonths(1))
                 .build();
 
-        service.registrarSaldo(comando);
+        service.ejecutar(comando);
 
-        ArgumentCaptor<CrearNotificacionCommand> captor = ArgumentCaptor.forClass(CrearNotificacionCommand.class);
-        verify(crearNotificacionPort, times(2)).notificarTransaccional(captor.capture());
-        List<CrearNotificacionCommand> comandos = captor.getAllValues();
+        ArgumentCaptor<List<EventoCuota>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cuotaRepository).saveAll(captor.capture());
+        List<EventoCuota> cuotas = captor.getValue();
 
-        assertTrue(comandos.stream().anyMatch(c -> "EVENTO_SALDO_RECIBIDO".equals(c.getTipoCodigo())
-                && gestorId.equals(c.getDestinatarioUsuarioId())));
-        assertTrue(comandos.stream().anyMatch(c -> "EVENTO_ABONO_RECIBIDO".equals(c.getTipoCodigo())
-                && Long.valueOf(5L).equals(c.getDestinatarioClienteId())));
+        assertEquals(3, cuotas.size());
+        BigDecimal total = cuotas.stream().map(EventoCuota::getMonto).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, new BigDecimal("300.00").compareTo(total));
+
+        EventoCuota primera = cuotas.stream().filter(c -> c.getNumeroCuota() == 1).findFirst().orElseThrow();
+        assertEquals(0, new BigDecimal("60.00").compareTo(primera.getMonto()));
+        assertEquals(EstadoCuota.PAGADO, primera.getEstado());
+        assertEquals(410L, primera.getVentaId());
+    }
+
+    @Test
+    void testSolicitarEventoComoClienteAjenoAlIdClienteLanzaAccessDeniedException() {
+        when(supabaseAuthFacade.tieneRol("CLIENTE")).thenReturn(true);
+        when(supabaseAuthFacade.clientePerfilId()).thenReturn(Optional.of(9L));
+
+        SolicitarEventoPrivadoCommand comando = SolicitarEventoPrivadoCommand.builder()
+                .idCliente(5L).idSede(1L).idTurno(1L)
+                .fechaEvento(LocalDate.now().plusMonths(1))
+                .tipoEvento("CUMPLEANOS")
+                .build();
+
+        assertThrows(AccessDeniedException.class, () -> service.ejecutar(comando));
+        verify(eventoRepository, never()).save(any());
     }
 
     @Test

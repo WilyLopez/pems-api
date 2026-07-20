@@ -165,6 +165,7 @@ public class EventoPrivadoController {
 
     @PostMapping("/{id}/confirmar")
     @PreAuthorize("hasAuthority('evento.confirmar')")
+    @RateLimited(requests = 5, durationInSeconds = 60)
     public ResponseEntity<ApiResponse<EventoPrivadoResponse>> confirmar(
             @PathVariable Long id,
             @Valid @RequestBody ConfirmarEventoRequest request) {
@@ -195,6 +196,7 @@ public class EventoPrivadoController {
 
     @PostMapping("/{id}/registrar-saldo")
     @PreAuthorize("hasAuthority('evento.confirmar')")
+    @RateLimited(requests = 5, durationInSeconds = 60)
     public ResponseEntity<ApiResponse<EventoPrivadoResponse>> registrarSaldo(
             @PathVariable Long id,
             @Valid @RequestBody RegistrarSaldoRequest request) {
@@ -211,6 +213,7 @@ public class EventoPrivadoController {
 
     @PostMapping("/{idEvento}/cuotas/{idCuota}/pagar")
     @PreAuthorize("hasAuthority('evento.confirmar')")
+    @RateLimited(requests = 5, durationInSeconds = 60)
     public ResponseEntity<ApiResponse<EventoPrivadoResponse>> pagarCuota(
             @PathVariable Long idEvento,
             @PathVariable Long idCuota,

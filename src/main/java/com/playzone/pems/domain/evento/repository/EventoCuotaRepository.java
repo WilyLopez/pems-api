@@ -10,6 +10,7 @@ public interface EventoCuotaRepository {
     EventoCuota save(EventoCuota cuota);
     List<EventoCuota> saveAll(List<EventoCuota> cuotas);
     Optional<EventoCuota> findById(Long id);
+    Optional<EventoCuota> findByIdForUpdate(Long id);
     List<EventoCuota> findByEventoId(Long eventoId);
     List<EventoCuota> findPendientesVencidosAntes(LocalDate fecha);
 }
