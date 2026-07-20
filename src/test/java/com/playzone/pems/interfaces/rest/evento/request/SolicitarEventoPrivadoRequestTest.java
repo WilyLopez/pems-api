@@ -11,6 +11,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -104,5 +105,27 @@ class SolicitarEventoPrivadoRequestTest {
         Set<ConstraintViolation<SolicitarEventoPrivadoRequest>> violaciones = validator.validate(request);
 
         assertFalse(tieneViolacionEn(violaciones, "tipoEvento"));
+    }
+
+    @Test
+    void testExtraLibreDeMasDe500CaracteresEsRechazado() {
+        SolicitarEventoPrivadoRequest request = requestBase();
+        ReflectionTestUtils.setField(request, "extrasLibres", List.of("A".repeat(501)));
+
+        Set<ConstraintViolation<SolicitarEventoPrivadoRequest>> violaciones = validator.validate(request);
+
+        assertTrue(violaciones.stream()
+                .anyMatch(v -> v.getPropertyPath().toString().startsWith("extrasLibres")));
+    }
+
+    @Test
+    void testExtraLibreDe500CaracteresEsValido() {
+        SolicitarEventoPrivadoRequest request = requestBase();
+        ReflectionTestUtils.setField(request, "extrasLibres", List.of("A".repeat(500)));
+
+        Set<ConstraintViolation<SolicitarEventoPrivadoRequest>> violaciones = validator.validate(request);
+
+        assertFalse(violaciones.stream()
+                .anyMatch(v -> v.getPropertyPath().toString().startsWith("extrasLibres")));
     }
 }

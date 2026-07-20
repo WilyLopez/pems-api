@@ -98,6 +98,14 @@ public class SolicitudEventoPrivadoValidator {
         }
     }
 
+    public void validarDescripcionPersonalizada(boolean esCotizacionPersonalizada, String descripcion) {
+        if (!esCotizacionPersonalizada) return;
+        if (descripcion == null || descripcion.trim().length() < 30) {
+            throw new ValidationException("descripcionPersonalizada",
+                    "La descripción debe tener al menos 30 caracteres cuando se solicita una cotización personalizada.");
+        }
+    }
+
     public void validarAforoYEdad(Long idSede, Integer aforoDeclarado, Integer edadCumple) {
         ConfiguracionCalendario cfg = configRepository.obtener(idSede);
 
