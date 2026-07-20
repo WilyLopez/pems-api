@@ -18,6 +18,10 @@ public enum EstadoEventoPrivado {
             "CONFIRMADA",
             "Contrato firmado, evento agendado"
     ),
+    EN_CURSO(
+            "EN_CURSO",
+            "Evento en curso"
+    ),
     COMPLETADA(
             "COMPLETADA",
             "Evento realizado exitosamente"
@@ -45,7 +49,7 @@ public enum EstadoEventoPrivado {
     }
 
     public boolean bloqueaDisponibilidadPublica() {
-        return this == SOLICITADA || this == CONFIRMADA;
+        return this == SOLICITADA || this == CONFIRMADA || this == EN_CURSO;
     }
 
     public boolean requiereMotivoCancelacion() {

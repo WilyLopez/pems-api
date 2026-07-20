@@ -1,6 +1,7 @@
 package com.playzone.pems.infrastructure.persistence.evento.mapper;
 
 import com.playzone.pems.domain.evento.model.EventoPrivado;
+import com.playzone.pems.domain.evento.model.enums.ModalidadPago;
 import com.playzone.pems.infrastructure.persistence.calendario.entity.TurnoEntity;
 import com.playzone.pems.infrastructure.persistence.evento.entity.EventoPrivadoEntity;
 import com.playzone.pems.infrastructure.persistence.usuario.entity.SedeEntity;
@@ -80,7 +81,7 @@ public class EventoPrivadoEntityMapper {
                 .checklistCompleto(d.isChecklistCompleto())
                 .horaInicioReal(d.getHoraInicioReal())
                 .horaFinReal(d.getHoraFinReal())
-                .modalidadPago(d.getModalidadPago() != null ? d.getModalidadPago() : "AL_CONTADO")
+                .modalidadPago(d.getModalidadPago() != null ? d.getModalidadPago() : ModalidadPago.AL_CONTADO)
                 .fechaLimitePago(d.getFechaLimitePago())
                 .createdBy(d.getCreatedBy())
                 .updatedBy(d.getUpdatedBy())

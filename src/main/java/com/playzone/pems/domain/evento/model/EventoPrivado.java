@@ -1,6 +1,7 @@
 package com.playzone.pems.domain.evento.model;
 
 import com.playzone.pems.domain.evento.model.enums.EstadoEventoPrivado;
+import com.playzone.pems.domain.evento.model.enums.ModalidadPago;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -48,7 +49,8 @@ public class EventoPrivado {
     private boolean             checklistCompleto;
     private OffsetDateTime      horaInicioReal;
     private OffsetDateTime      horaFinReal;
-    private String              modalidadPago;    // AL_CONTADO | CUOTAS
+    @Builder.Default
+    private ModalidadPago       modalidadPago = ModalidadPago.AL_CONTADO;
     private LocalDate           fechaLimitePago;
 
     public BigDecimal calcularMontoSaldo() {

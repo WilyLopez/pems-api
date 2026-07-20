@@ -1,6 +1,7 @@
 package com.playzone.pems.infrastructure.persistence.evento.adapter;
 
 import com.playzone.pems.domain.evento.model.EventoCuota;
+import com.playzone.pems.domain.evento.model.enums.EstadoCuota;
 import com.playzone.pems.domain.evento.repository.EventoCuotaRepository;
 import com.playzone.pems.infrastructure.persistence.evento.entity.EventoCuotaEntity;
 import com.playzone.pems.infrastructure.persistence.evento.jpa.EventoCuotaJpaRepository;
@@ -34,6 +35,11 @@ public class EventoCuotaPersistenceAdapter implements EventoCuotaRepository {
     }
 
     @Override
+    public Optional<EventoCuota> findByIdForUpdate(Long id) {
+        return jpa.findByIdForUpdate(id).map(this::toDomain);
+    }
+
+    @Override
     public List<EventoCuota> findByEventoId(Long eventoId) {
         return jpa.findByEventoIdOrderByNumeroCuotaAsc(eventoId)
                 .stream().map(this::toDomain).toList();
@@ -41,7 +47,7 @@ public class EventoCuotaPersistenceAdapter implements EventoCuotaRepository {
 
     @Override
     public List<EventoCuota> findPendientesVencidosAntes(LocalDate fecha) {
-        return jpa.findByEstadoAndFechaVencimientoBefore("PENDIENTE", fecha)
+        return jpa.findByEstadoAndFechaVencimientoBefore(EstadoCuota.PENDIENTE, fecha)
                 .stream().map(this::toDomain).toList();
     }
 

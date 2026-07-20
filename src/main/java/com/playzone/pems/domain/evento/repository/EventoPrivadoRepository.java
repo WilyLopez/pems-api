@@ -30,8 +30,6 @@ public interface EventoPrivadoRepository {
 
     List<EventoPrivado> findBySedeAndFecha(Long idSede, LocalDate fecha);
 
-    boolean existsActivoBySedeAndFechaAndTurno(Long idSede, LocalDate fecha, Long idTurno);
-
     boolean existsActivoBySedeAndFechaAndCodigoTurno(Long idSede, LocalDate fecha, String codigoTurno);
 
     boolean existsActivoBySedeAndFecha(Long idSede, LocalDate fecha);

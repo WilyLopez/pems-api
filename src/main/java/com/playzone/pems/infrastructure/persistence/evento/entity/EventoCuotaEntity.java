@@ -1,5 +1,6 @@
 package com.playzone.pems.infrastructure.persistence.evento.entity;
 
+import com.playzone.pems.domain.evento.model.enums.EstadoCuota;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -33,8 +34,9 @@ public class EventoCuotaEntity {
     @Column(name = "fecha_vencimiento", nullable = false)
     private LocalDate fechaVencimiento;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 20)
-    private String estado;
+    private EstadoCuota estado;
 
     @Column(name = "venta_id")
     private Long ventaId;
