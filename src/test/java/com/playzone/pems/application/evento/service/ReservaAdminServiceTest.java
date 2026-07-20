@@ -116,7 +116,7 @@ class ReservaAdminServiceTest {
         when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
         when(reservaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
-                .horaCierre(LocalTime.of(20, 0)).build());
+                .horaApertura(LocalTime.of(0, 0)).horaCierre(LocalTime.of(23, 59)).build());
 
         service.marcarEntrada(1L);
 
@@ -136,7 +136,7 @@ class ReservaAdminServiceTest {
         when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
         when(reservaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
-                .horaCierre(LocalTime.of(23, 59)).build());
+                .horaApertura(LocalTime.of(0, 0)).horaCierre(LocalTime.of(23, 59)).build());
 
         ArgumentCaptor<ReservaPublica> captor = ArgumentCaptor.forClass(ReservaPublica.class);
         service.marcarEntrada(1L);
@@ -154,8 +154,10 @@ class ReservaAdminServiceTest {
                 .build();
         when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
         when(reservaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        LocalTime ahora = FechaUtil.ahora().toLocalTime();
+        LocalTime cierre = ahora.plusMinutes(30);
         when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
-                .horaCierre(LocalTime.of(0, 1)).build());
+                .horaApertura(ahora.minusHours(1)).horaCierre(cierre).build());
 
         ArgumentCaptor<ReservaPublica> captor = ArgumentCaptor.forClass(ReservaPublica.class);
         service.marcarEntrada(1L);
@@ -163,7 +165,7 @@ class ReservaAdminServiceTest {
 
         ReservaPublica guardada = captor.getValue();
         assertEquals(
-                guardada.getFechaEvento().atTime(LocalTime.of(0, 1)).atZone(FechaUtil.ZONA_PERU).toOffsetDateTime(),
+                guardada.getFechaEvento().atTime(cierre).atZone(FechaUtil.ZONA_PERU).toOffsetDateTime(),
                 guardada.getPermanenciaFinAt());
     }
 
@@ -259,6 +261,35 @@ class ReservaAdminServiceTest {
 
         assertThrows(ValidationException.class, () -> service.marcarEntrada(1L));
         verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
+    void testMarcarEntradaRechazaFueraDelHorarioDeAtencion() {
+        ReservaPublica reserva = reservaConfirmada().toBuilder().fechaEvento(LocalDate.now()).build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
+        LocalTime ahora = FechaUtil.ahora().toLocalTime();
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .horaApertura(ahora.plusHours(1))
+                .horaCierre(ahora.plusHours(2))
+                .build());
+
+        assertThrows(ValidationException.class, () -> service.marcarEntrada(1L));
+        verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
+    void testMarcarEntradaPermiteDentroDelHorarioDeAtencion() {
+        ReservaPublica reserva = reservaConfirmada().toBuilder().fechaEvento(LocalDate.now()).build();
+        when(reservaRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reserva));
+        when(reservaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        LocalTime ahora = FechaUtil.ahora().toLocalTime();
+        when(configRepository.obtener(1L)).thenReturn(ConfiguracionCalendario.builder()
+                .horaApertura(ahora.minusHours(1))
+                .horaCierre(ahora.plusHours(1))
+                .build());
+
+        assertDoesNotThrow(() -> service.marcarEntrada(1L));
+        verify(reservaRepository).save(any());
     }
 
     @Test

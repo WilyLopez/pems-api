@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Map;
@@ -181,8 +182,15 @@ public class ReservaAdminService
             throw new ValidationException("Este ticket no puede ser ingresado sin estar asociado a una venta (pago registrado).");
         }
 
-        OffsetDateTime ingresoAt = OffsetDateTime.now(FechaUtil.ZONA_PERU);
         ConfiguracionCalendario cfg = configRepository.obtener(r.getIdSede());
+        LocalTime horaActual = FechaUtil.ahora().toLocalTime();
+        if (horaActual.isBefore(cfg.getHoraApertura()) || horaActual.isAfter(cfg.getHoraCierre())) {
+            throw new ValidationException(
+                    "Solo se puede registrar el ingreso dentro del horario de atención del local ("
+                    + cfg.getHoraApertura() + " a " + cfg.getHoraCierre() + ").");
+        }
+
+        OffsetDateTime ingresoAt = OffsetDateTime.now(FechaUtil.ZONA_PERU);
         OffsetDateTime permanenciaFinAt = calcularPermanenciaFinAt(r, ingresoAt, cfg);
 
         ReservaPublica actualizada = r.toBuilder()
