@@ -36,13 +36,13 @@ public class SolicitarEventoPrivadoCommand {
     @Size(max = 30)
     private final String origenContacto;
 
-    @Min(1) @Max(60)
+    @Min(1)
     private final Integer aforoDeclarado;
 
     @Size(max = 120)
     private final String nombreNino;
 
-    @Min(0) @Max(18)
+    @Min(0)
     private final Integer edadCumple;
 
     private final Long         idPaquete;
