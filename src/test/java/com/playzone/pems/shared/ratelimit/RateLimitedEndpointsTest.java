@@ -3,7 +3,10 @@ package com.playzone.pems.shared.ratelimit;
 import com.playzone.pems.interfaces.rest.cms.MensajeContactoController;
 import com.playzone.pems.interfaces.rest.evento.EventoPrivadoController;
 import com.playzone.pems.interfaces.rest.evento.ReservaPublicaController;
+import com.playzone.pems.interfaces.rest.evento.request.ConfirmarEventoRequest;
 import com.playzone.pems.interfaces.rest.evento.request.CrearReservaRequest;
+import com.playzone.pems.interfaces.rest.evento.request.RegistrarPagoCuotaRequest;
+import com.playzone.pems.interfaces.rest.evento.request.RegistrarSaldoRequest;
 import com.playzone.pems.interfaces.rest.evento.request.SolicitarEventoPrivadoRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,27 @@ class RateLimitedEndpointsTest {
     void testSolicitarEventoPrivadoTieneRateLimited() throws NoSuchMethodException {
         Method metodo = EventoPrivadoController.class.getMethod(
                 "solicitar", Long.class, Long.class, SolicitarEventoPrivadoRequest.class);
+        assertTrue(metodo.isAnnotationPresent(RateLimited.class));
+    }
+
+    @Test
+    void testConfirmarEventoPrivadoTieneRateLimited() throws NoSuchMethodException {
+        Method metodo = EventoPrivadoController.class.getMethod(
+                "confirmar", Long.class, ConfirmarEventoRequest.class);
+        assertTrue(metodo.isAnnotationPresent(RateLimited.class));
+    }
+
+    @Test
+    void testRegistrarSaldoEventoPrivadoTieneRateLimited() throws NoSuchMethodException {
+        Method metodo = EventoPrivadoController.class.getMethod(
+                "registrarSaldo", Long.class, RegistrarSaldoRequest.class);
+        assertTrue(metodo.isAnnotationPresent(RateLimited.class));
+    }
+
+    @Test
+    void testPagarCuotaEventoPrivadoTieneRateLimited() throws NoSuchMethodException {
+        Method metodo = EventoPrivadoController.class.getMethod(
+                "pagarCuota", Long.class, Long.class, RegistrarPagoCuotaRequest.class);
         assertTrue(metodo.isAnnotationPresent(RateLimited.class));
     }
 
