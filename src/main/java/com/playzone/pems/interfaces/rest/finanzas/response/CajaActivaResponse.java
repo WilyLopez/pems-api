@@ -2,7 +2,6 @@ package com.playzone.pems.interfaces.rest.finanzas.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -21,7 +20,6 @@ public class CajaActivaResponse {
     private Long                          idSede;
     private UUID                          usuarioId;
     private String                        nombreCajero;
-    private TipoSesionCaja                tipo;
     private EstadoCaja                    estado;
     private LocalDate                     fecha;
     private BigDecimal                    saldoInicial;

@@ -14,7 +14,6 @@ import com.playzone.pems.domain.finanzas.model.MovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.SesionCaja;
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.domain.finanzas.repository.ArqueoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.MovimientoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
@@ -81,7 +80,7 @@ class SesionCajaServiceTest {
         when(resolverAdministradoresPort.obtenerIdsAdministradoresActivos()).thenReturn(List.of(adminId));
 
         AbrirCajaCommand comando = AbrirCajaCommand.builder()
-                .idSede(1L).tipo(TipoSesionCaja.CAJERO).saldoInicial(new BigDecimal("100.00"))
+                .idSede(1L).saldoInicial(new BigDecimal("100.00"))
                 .idUsuarioApertura(usuarioId).build();
 
         service.abrir(comando);

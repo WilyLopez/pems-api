@@ -11,7 +11,6 @@ import com.playzone.pems.application.finanzas.dto.query.MovimientoCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.ResumenCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.SesionCajaQuery;
 import com.playzone.pems.application.finanzas.port.in.GestionarCajaUseCase;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.interfaces.rest.finanzas.request.AbrirCajaRequest;
@@ -57,7 +56,6 @@ public class CajaController {
         UUID usuario = usuarioActual();
         SesionCajaQuery query = useCase.abrir(AbrirCajaCommand.builder()
                 .idSede(idSede)
-                .tipo(tipoSesionDelUsuario())
                 .saldoInicial(request.getSaldoInicial())
                 .idUsuarioApertura(usuario)
                 .observaciones(request.getObservaciones())
@@ -223,16 +221,11 @@ public class CajaController {
         return supabaseAuthFacade.tieneRol("SUPERADMIN") || supabaseAuthFacade.tieneRol("ADMIN");
     }
 
-    private TipoSesionCaja tipoSesionDelUsuario() {
-        return esAdmin() ? TipoSesionCaja.ADMINISTRATIVA : TipoSesionCaja.CAJERO;
-    }
-
     private SesionCajaResponse toResponse(SesionCajaQuery q) {
         return SesionCajaResponse.builder()
                 .id(q.getId())
                 .idSede(q.getIdSede())
                 .usuarioId(q.getUsuarioId())
-                .tipo(q.getTipo())
                 .fecha(q.getFecha())
                 .saldoInicial(q.getSaldoInicial())
                 .saldoFinal(q.getSaldoFinal())
@@ -286,7 +279,6 @@ public class CajaController {
                 .id(q.getId())
                 .idSede(q.getIdSede())
                 .usuarioId(q.getUsuarioId())
-                .tipo(q.getTipo())
                 .fecha(q.getFecha())
                 .saldoInicial(q.getSaldoInicial())
                 .totalIngresos(q.getTotalIngresos())
@@ -311,7 +303,6 @@ public class CajaController {
                 .idSede(q.getIdSede())
                 .usuarioId(q.getUsuarioId())
                 .nombreCajero(q.getNombreCajero())
-                .tipo(q.getTipo())
                 .estado(q.getEstado())
                 .fecha(q.getFecha())
                 .saldoInicial(q.getSaldoInicial())

@@ -1,7 +1,6 @@
 package com.playzone.pems.application.finanzas.dto.query;
 
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -17,7 +16,6 @@ public class ResumenCajaQuery {
     private Long               id;
     private Long               idSede;
     private UUID               usuarioId;
-    private TipoSesionCaja     tipo;
     private LocalDate          fecha;
     private BigDecimal         saldoInicial;
     private BigDecimal         totalIngresos;

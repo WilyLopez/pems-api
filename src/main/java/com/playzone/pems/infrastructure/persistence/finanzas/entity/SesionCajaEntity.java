@@ -1,7 +1,6 @@
 package com.playzone.pems.infrastructure.persistence.finanzas.entity;
 
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.infrastructure.persistence.usuario.entity.SedeEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,10 +31,6 @@ public class SesionCajaEntity {
 
     @Column(name = "usuario_id", nullable = false, columnDefinition = "uuid")
     private UUID usuarioId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tipo", nullable = false, length = 20)
-    private TipoSesionCaja tipo;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_codigo", nullable = false, length = 20)

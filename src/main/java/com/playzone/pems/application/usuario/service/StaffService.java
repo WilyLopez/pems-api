@@ -447,7 +447,6 @@ public class StaffService implements
     private void notificarCajaAbiertaDeStaffInactivo(UUID usuarioId, SesionCaja sesion) {
         Map<String, String> datosExtra = Map.of(
                 "usuario", nombreStaff(usuarioId),
-                "tipo", sesion.getTipo().toString(),
                 "sede", sedeRepository.findById(sesion.getIdSede()).map(Sede::getNombre)
                         .orElse("Sede #" + sesion.getIdSede()));
         for (UUID adminId : resolverAdministradoresPort.obtenerIdsAdministradoresActivos()) {

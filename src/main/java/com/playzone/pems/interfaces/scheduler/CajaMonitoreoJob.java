@@ -73,7 +73,6 @@ public class CajaMonitoreoJob {
 
         notificarAdmins("CAJA_SESION_PROLONGADA", Map.of(
                 "usuario", nombreUsuario(sesion.getUsuarioId()),
-                "tipo", sesion.getTipo().toString(),
                 "sede", nombreSede(sesion.getIdSede()),
                 "horas", String.valueOf(horasAbierta)));
 
@@ -108,7 +107,6 @@ public class CajaMonitoreoJob {
         long horasDesdeCierre = Duration.between(cierreHoy, ahora).toHours();
         notificarAdmins("CAJA_SESION_PROLONGADA", Map.of(
                 "usuario", nombreUsuario(sesion.getUsuarioId()),
-                "tipo", sesion.getTipo().toString(),
                 "sede", nombreSede(sesion.getIdSede()),
                 "horas", String.valueOf(horasDesdeCierre)));
 

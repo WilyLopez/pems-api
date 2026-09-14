@@ -107,7 +107,6 @@ public class SesionCajaService implements GestionarCajaUseCase {
         SesionCaja sesion = SesionCaja.builder()
                 .idSede(command.getIdSede())
                 .usuarioId(command.getIdUsuarioApertura())
-                .tipo(command.getTipo())
                 .estado(EstadoCaja.ABIERTA)
                 .saldoInicial(saldoInicial)
                 .totalIngresos(BigDecimal.ZERO)
@@ -128,14 +127,13 @@ public class SesionCajaService implements GestionarCajaUseCase {
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 command.getIdUsuarioApertura(), AuditoriaConstants.ACCION_ABRIR, AuditoriaConstants.MOD_CAJA,
                 "SesionCaja", resultado.getId(),
-                null, "tipo=" + command.getTipo() + " | saldoInicial=" + saldoInicial,
-                "Caja abierta (" + command.getTipo() + ") en sede #" + command.getIdSede(),
+                null, "saldoInicial=" + saldoInicial,
+                "Caja abierta en sede #" + command.getIdSede(),
                 null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
 
         notificarAdmins("CAJA_APERTURA", Map.of(
                 "sede", nombreSede(command.getIdSede()),
                 "usuario", nombreUsuario(command.getIdUsuarioApertura()),
-                "tipo", command.getTipo().toString(),
                 "saldoInicial", saldoInicial.toPlainString()));
 
         return resultado;
@@ -413,7 +411,6 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .id(sesion.getId())
                 .idSede(sesion.getIdSede())
                 .usuarioId(sesion.getUsuarioId())
-                .tipo(sesion.getTipo())
                 .fecha(fechaDe(sesion))
                 .saldoInicial(sesion.getSaldoInicial())
                 .totalIngresos(sesion.getTotalIngresos())
@@ -466,7 +463,6 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .idSede(sesion.getIdSede())
                 .usuarioId(sesion.getUsuarioId())
                 .nombreCajero(nombreUsuario(sesion.getUsuarioId()))
-                .tipo(sesion.getTipo())
                 .estado(sesion.getEstado())
                 .fecha(fechaDe(sesion))
                 .saldoInicial(sesion.getSaldoInicial())
@@ -557,7 +553,7 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 ? sesion.getFechaApertura().atZoneSameInstant(LIMA)
                         .format(DateTimeFormatter.ofPattern("HH:mm"))
                 : "una fecha anterior";
-        return "Ya existe una caja " + sesion.getTipo() + " abierta en esta sede, a cargo de "
+        return "Ya existe una caja abierta en esta sede, a cargo de "
                 + nombreUsuario(sesion.getUsuarioId()) + " desde las " + hora + ".";
     }
 
@@ -590,7 +586,6 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .id(s.getId())
                 .idSede(s.getIdSede())
                 .usuarioId(s.getUsuarioId())
-                .tipo(s.getTipo())
                 .fecha(fechaDe(s))
                 .saldoInicial(s.getSaldoInicial())
                 .saldoFinal(s.getSaldoFinal())
