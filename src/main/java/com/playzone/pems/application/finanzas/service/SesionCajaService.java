@@ -23,6 +23,8 @@ import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
 import com.playzone.pems.domain.finanzas.repository.ArqueoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.MovimientoCajaRepository;
+import com.playzone.pems.domain.calendario.model.ConfiguracionCalendario;
+import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.domain.configuracion.model.ConfiguracionGlobal;
 import com.playzone.pems.domain.configuracion.repository.ConfiguracionGlobalRepository;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
@@ -41,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -59,16 +62,17 @@ public class SesionCajaService implements GestionarCajaUseCase {
     private static final String CLAVE_MONTO_MOVIMIENTO_GRANDE = "CAJA_MONTO_MOVIMIENTO_GRANDE";
     private static final BigDecimal MONTO_MOVIMIENTO_GRANDE_DEFECTO = new BigDecimal("500");
 
-    private final SesionCajaRepository           sesionCajaRepository;
-    private final MovimientoCajaRepository       movimientoCajaRepository;
-    private final ArqueoCajaRepository           arqueoCajaRepository;
-    private final ConfiguracionGlobalRepository  configuracionGlobalRepository;
-    private final SupabaseAuthFacade             authFacade;
-    private final RegistrarLogUseCase            auditoria;
-    private final CrearNotificacionPort          crearNotificacionPort;
-    private final ResolverAdministradoresPort    resolverAdministradoresPort;
-    private final PerfilUsuarioRepository        perfilUsuarioRepository;
-    private final SedeRepository                 sedeRepository;
+    private final SesionCajaRepository            sesionCajaRepository;
+    private final MovimientoCajaRepository        movimientoCajaRepository;
+    private final ArqueoCajaRepository            arqueoCajaRepository;
+    private final ConfiguracionGlobalRepository   configuracionGlobalRepository;
+    private final ConfiguracionCalendarioRepository configuracionCalendarioRepository;
+    private final SupabaseAuthFacade              authFacade;
+    private final RegistrarLogUseCase             auditoria;
+    private final CrearNotificacionPort           crearNotificacionPort;
+    private final ResolverAdministradoresPort     resolverAdministradoresPort;
+    private final PerfilUsuarioRepository         perfilUsuarioRepository;
+    private final SedeRepository                  sedeRepository;
 
     @Override
     public SesionCajaQuery abrir(AbrirCajaCommand command) {
@@ -82,6 +86,8 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .ifPresent(s -> {
                     throw new ValidationException(mensajeCajaYaAbiertaEnSede(s));
                 });
+
+        validarHorarioApertura(command.getIdSede());
 
         BigDecimal saldoInicial = command.getSaldoInicial() != null
                 ? command.getSaldoInicial() : BigDecimal.ZERO;
@@ -463,6 +469,25 @@ public class SesionCajaService implements GestionarCajaUseCase {
 
     private String nombreSede(Long idSede) {
         return sedeRepository.findById(idSede).map(Sede::getNombre).orElse("Sede #" + idSede);
+    }
+
+    private void validarHorarioApertura(Long idSede) {
+        ConfiguracionCalendario config;
+        try {
+            config = configuracionCalendarioRepository.obtener(idSede);
+        } catch (ResourceNotFoundException e) {
+            return;
+        }
+        if (config == null || config.getHoraApertura() == null) {
+            return;
+        }
+        LocalTime ahora = OffsetDateTime.now(LIMA).toLocalTime();
+        LocalTime limiteInferior = config.getHoraApertura().minusHours(2);
+        if (ahora.isBefore(limiteInferior)) {
+            throw new ValidationException(
+                    "No se puede abrir la caja antes de las " + limiteInferior.format(DateTimeFormatter.ofPattern("HH:mm"))
+                            + " (2 horas antes de la apertura del local).");
+        }
     }
 
     private String mensajeCajaYaAbiertaEnSede(SesionCaja sesion) {

@@ -8,6 +8,7 @@ import com.playzone.pems.application.finanzas.dto.command.RegistrarMovimientoMan
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
 import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
+import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.domain.configuracion.repository.ConfiguracionGlobalRepository;
 import com.playzone.pems.domain.finanzas.model.MovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.SesionCaja;
@@ -44,6 +45,7 @@ class SesionCajaServiceTest {
     @Mock private MovimientoCajaRepository movimientoCajaRepository;
     @Mock private ArqueoCajaRepository arqueoCajaRepository;
     @Mock private ConfiguracionGlobalRepository configuracionGlobalRepository;
+    @Mock private ConfiguracionCalendarioRepository configuracionCalendarioRepository;
     @Mock private SupabaseAuthFacade authFacade;
     @Mock private RegistrarLogUseCase auditoria;
     @Mock private CrearNotificacionPort crearNotificacionPort;
@@ -57,7 +59,7 @@ class SesionCajaServiceTest {
     void setUp() {
         service = new SesionCajaService(
                 sesionCajaRepository, movimientoCajaRepository, arqueoCajaRepository,
-                configuracionGlobalRepository, authFacade, auditoria,
+                configuracionGlobalRepository, configuracionCalendarioRepository, authFacade, auditoria,
                 crearNotificacionPort, resolverAdministradoresPort, perfilUsuarioRepository, sedeRepository);
     }
 
