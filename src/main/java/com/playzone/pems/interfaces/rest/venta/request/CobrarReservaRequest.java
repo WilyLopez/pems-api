@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -25,4 +26,7 @@ public class CobrarReservaRequest {
     private boolean actaFirmada;
 
     private String notas;
+
+    @Size(max = 100)
+    private String idempotencyKey;
 }

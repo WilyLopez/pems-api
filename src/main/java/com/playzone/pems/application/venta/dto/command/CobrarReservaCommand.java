@@ -15,4 +15,5 @@ public class CobrarReservaCommand {
     private final boolean actaFirmada;
     private final String notas;
     private final java.util.UUID createdBy;
+    private final String idempotencyKey;
 }

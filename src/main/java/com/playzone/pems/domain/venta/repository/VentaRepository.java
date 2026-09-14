@@ -29,7 +29,22 @@ public interface VentaRepository {
             String search,
             Pageable pageable);
 
-    Page<Venta> findByUsuario(UUID idUsuario, Pageable pageable);
+    Page<Venta> findBySedeAndFechasBetweenAndUsuario(
+            Long idSede,
+            OffsetDateTime desde,
+            OffsetDateTime hasta,
+            UUID idUsuario,
+            Pageable pageable);
+
+    Page<Venta> findBySedeAndFechasBetweenAndUsuarioAndSearch(
+            Long idSede,
+            OffsetDateTime desde,
+            OffsetDateTime hasta,
+            UUID idUsuario,
+            String search,
+            Pageable pageable);
+
+    Optional<Venta> findByCreatedByAndIdempotencyKey(UUID createdBy, String idempotencyKey);
 
     Venta save(Venta venta);
 

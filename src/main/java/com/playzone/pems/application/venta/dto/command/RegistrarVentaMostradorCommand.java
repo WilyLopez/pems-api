@@ -28,4 +28,5 @@ public class RegistrarVentaMostradorCommand {
     private BigDecimal              efectivoRecibido;
     private boolean                 actaFirmada;
     private String                  notas;
+    private String                  idempotencyKey;
 }

@@ -54,8 +54,23 @@ public class VentaPersistenceAdapter implements VentaRepository {
     }
 
     @Override
-    public Page<Venta> findByUsuario(UUID idUsuario, Pageable pageable) {
-        return ventaJpa.findByCreatedBy(idUsuario, pageable).map(mapper::toDomain);
+    public Page<Venta> findBySedeAndFechasBetweenAndUsuario(Long idSede, OffsetDateTime desde,
+                                                            OffsetDateTime hasta, UUID idUsuario, Pageable pageable) {
+        return ventaJpa.findBySede_IdAndCreatedAtBetweenAndCreatedBy(idSede, desde, hasta, idUsuario, pageable)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Page<Venta> findBySedeAndFechasBetweenAndUsuarioAndSearch(Long idSede, OffsetDateTime desde,
+                                                                     OffsetDateTime hasta, UUID idUsuario,
+                                                                     String search, Pageable pageable) {
+        return ventaJpa.findBySedeAndCreatedAtBetweenAndCreatedByAndSearch(idSede, desde, hasta, idUsuario, search, pageable)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<Venta> findByCreatedByAndIdempotencyKey(UUID createdBy, String idempotencyKey) {
+        return ventaJpa.findByCreatedByAndIdempotencyKey(createdBy, idempotencyKey).map(mapper::toDomain);
     }
 
     @Override

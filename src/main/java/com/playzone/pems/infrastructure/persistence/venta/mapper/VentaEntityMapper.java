@@ -36,6 +36,7 @@ public class VentaEntityMapper {
                 .enviadoCorreo(e.isEnviadoCorreo())
                 .descargado(e.isDescargado())
                 .notas(e.getNotas())
+                .idempotencyKey(e.getIdempotencyKey())
                 .createdAt(e.getCreatedAt() != null ? e.getCreatedAt() : null)
                 .updatedAt(e.getUpdatedAt() != null ? e.getUpdatedAt() : null)
                 .createdBy(e.getCreatedBy())
@@ -69,6 +70,7 @@ public class VentaEntityMapper {
                 .enviadoCorreo(d.isEnviadoCorreo())
                 .descargado(d.isDescargado())
                 .notas(d.getNotas())
+                .idempotencyKey(d.getIdempotencyKey())
                 .createdBy(d.getCreatedBy())
                 .build();
     }

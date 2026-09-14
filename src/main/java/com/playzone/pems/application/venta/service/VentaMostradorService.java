@@ -27,6 +27,7 @@ import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ValidationException;
 import com.playzone.pems.shared.util.FechaUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -62,6 +64,16 @@ public class VentaMostradorService {
         UUID usuarioActual = authFacade.usuarioActualId()
                 .orElseThrow(() -> new ValidationException(
                         "Sesion requerida para registrar venta en mostrador."));
+
+        String idempotencyKey = normalizarIdempotencyKey(cmd.getIdempotencyKey());
+        if (idempotencyKey != null) {
+            Optional<Venta> ventaExistente =
+                    ventaRepository.findByCreatedByAndIdempotencyKey(usuarioActual, idempotencyKey);
+            if (ventaExistente.isPresent()) {
+                return reconstruirQuery(ventaExistente.get());
+            }
+        }
+
         if (sesionCajaRepository.findAbiertaByUsuarioAndSede(usuarioActual, cmd.getSedeId()).isEmpty()) {
             throw new ValidationException(
                     "No tienes una caja abierta en la sede indicada. Abre tu caja antes de registrar ventas.");
@@ -123,27 +135,38 @@ public class VentaMostradorService {
 
         Long clienteEfectivo = cmd.getClienteId() != null ? cmd.getClienteId() : ID_CLIENTE_ANONIMO;
 
-        Venta ventaGuardada = ventaRepository.save(Venta.builder()
-                .idSede(cmd.getSedeId())
-                .clienteId(clienteEfectivo)
-                .tipo("RESERVA")
-                .canalCodigo("MOSTRADOR")
-                .fechaVisita(cmd.getFechaVisita())
-                .nombreAcompanante(cmd.getNombreAcompanante())
-                .dniAcompanante(cmd.getDniAcompanante())
-                .tipoDocumentoAcompanante(cmd.getTipoDocumentoAcompanante())
-                .telefonoAcompanante(cmd.getTelefonoAcompanante())
-                .promocionId(cmd.getIdPromocion())
-                .subtotal(subtotal)
-                .descuento(descuento)
-                .total(total)
-                .efectivoRecibido(efectivoRecibido)
-                .vuelto(vuelto)
-                .actaFirmada(cmd.isActaFirmada())
-                .esAnticipada(cmd.getFechaVisita().isAfter(LocalDate.now()))
-                .notas(cmd.getNotas())
-                .createdBy(usuarioActual)
-                .build());
+        Venta ventaGuardada;
+        try {
+            ventaGuardada = ventaRepository.save(Venta.builder()
+                    .idSede(cmd.getSedeId())
+                    .clienteId(clienteEfectivo)
+                    .tipo("RESERVA")
+                    .canalCodigo("MOSTRADOR")
+                    .fechaVisita(cmd.getFechaVisita())
+                    .nombreAcompanante(cmd.getNombreAcompanante())
+                    .dniAcompanante(cmd.getDniAcompanante())
+                    .tipoDocumentoAcompanante(cmd.getTipoDocumentoAcompanante())
+                    .telefonoAcompanante(cmd.getTelefonoAcompanante())
+                    .promocionId(cmd.getIdPromocion())
+                    .subtotal(subtotal)
+                    .descuento(descuento)
+                    .total(total)
+                    .efectivoRecibido(efectivoRecibido)
+                    .vuelto(vuelto)
+                    .actaFirmada(cmd.isActaFirmada())
+                    .esAnticipada(cmd.getFechaVisita().isAfter(LocalDate.now()))
+                    .notas(cmd.getNotas())
+                    .idempotencyKey(idempotencyKey)
+                    .createdBy(usuarioActual)
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            if (idempotencyKey == null) {
+                throw e;
+            }
+            ventaGuardada = ventaRepository.findByCreatedByAndIdempotencyKey(usuarioActual, idempotencyKey)
+                    .orElseThrow(() -> e);
+            return reconstruirQuery(ventaGuardada);
+        }
 
         BigDecimal descuentoPorNino = cantidadNinos > 0
                 ? descuento.divide(BigDecimal.valueOf(cantidadNinos), 2, RoundingMode.HALF_UP)
@@ -256,6 +279,46 @@ public class VentaMostradorService {
                 .efectivoRecibido(ventaGuardada.getEfectivoRecibido())
                 .vuelto(ventaGuardada.getVuelto())
                 .createdAt(ventaGuardada.getCreatedAt())
+                .tickets(tickets)
+                .pagos(pagoResults)
+                .build();
+    }
+
+    private String normalizarIdempotencyKey(String idempotencyKey) {
+        return (idempotencyKey == null || idempotencyKey.isBlank()) ? null : idempotencyKey.trim();
+    }
+
+    private VentaMostradorQuery reconstruirQuery(Venta venta) {
+        List<VentaMostradorQuery.TicketMostradorQuery> tickets = reservaRepository.findByVentaId(venta.getId())
+                .stream()
+                .map(r -> VentaMostradorQuery.TicketMostradorQuery.builder()
+                        .reservaId(r.getId())
+                        .numeroTicket(r.getNumeroTicket())
+                        .codigoQr(r.getCodigoQr())
+                        .nombreNino(r.getNombreNino())
+                        .edadNino(r.getEdadNino())
+                        .build())
+                .toList();
+
+        List<VentaMostradorQuery.PagoMostradorResultQuery> pagoResults =
+                ventaPagoRepository.findByVentaId(venta.getId()).stream()
+                        .map(p -> VentaMostradorQuery.PagoMostradorResultQuery.builder()
+                                .pagoId(p.getId())
+                                .medioPago(p.getMedioPagoCodigo())
+                                .monto(p.getMonto())
+                                .build())
+                        .toList();
+
+        return VentaMostradorQuery.builder()
+                .ventaId(venta.getId())
+                .sedeId(venta.getIdSede())
+                .fechaVisita(venta.getFechaVisita())
+                .subtotal(venta.getSubtotal())
+                .descuento(venta.getDescuento())
+                .total(venta.getTotal())
+                .efectivoRecibido(venta.getEfectivoRecibido())
+                .vuelto(venta.getVuelto())
+                .createdAt(venta.getCreatedAt())
                 .tickets(tickets)
                 .pagos(pagoResults)
                 .build();

@@ -36,6 +36,7 @@ public class Venta {
     private boolean       enviadoCorreo;
     private boolean       descargado;
     private String        notas;
+    private String        idempotencyKey;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private UUID          createdBy;

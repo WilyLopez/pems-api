@@ -65,6 +65,7 @@ public class VentaController {
                         .toList())
                 .createdBy(supabaseAuthFacade.usuarioActualId()
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no autenticado")))
+                .idempotencyKey(request.getIdempotencyKey())
                 .build());
 
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -78,10 +79,12 @@ public class VentaController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) java.util.UUID usuarioId,
             Pageable pageable) {
 
         sedeScope.validarAcceso(idSede);
-        Page<VentaResponse> page = consultarUseCase.consultarPorSedeYFechas(idSede, desde, hasta, search, pageable)
+        Page<VentaResponse> page = consultarUseCase
+                .consultarPorSedeYFechas(idSede, desde, hasta, search, usuarioId, pageable)
                 .map(this::toResponse);
         return ResponseEntity.ok(ApiResponse.ok(page));
     }

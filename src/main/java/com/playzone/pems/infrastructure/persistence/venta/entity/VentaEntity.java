@@ -100,6 +100,9 @@ public class VentaEntity {
     @Column(name = "notas")
     private String notas;
 
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
