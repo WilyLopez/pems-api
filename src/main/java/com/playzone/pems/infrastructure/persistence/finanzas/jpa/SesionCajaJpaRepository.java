@@ -1,6 +1,7 @@
 package com.playzone.pems.infrastructure.persistence.finanzas.jpa;
 
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
+import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.infrastructure.persistence.finanzas.entity.SesionCajaEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +23,10 @@ public interface SesionCajaJpaRepository extends JpaRepository<SesionCajaEntity,
     Optional<SesionCajaEntity> findByUsuarioIdAndSede_IdAndEstado(UUID usuarioId, Long idSede, EstadoCaja estado);
 
     boolean existsBySede_IdAndEstado(Long idSede, EstadoCaja estado);
+
+    Optional<SesionCajaEntity> findBySede_IdAndTipoAndEstado(Long idSede, TipoSesionCaja tipo, EstadoCaja estado);
+
+    List<SesionCajaEntity> findByEstado(EstadoCaja estado);
 
     Optional<SesionCajaEntity> findFirstByUsuarioIdAndSede_IdAndFechaAperturaBetweenOrderByFechaAperturaDesc(
             UUID usuarioId, Long idSede, OffsetDateTime desde, OffsetDateTime hasta);
