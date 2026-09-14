@@ -34,6 +34,7 @@ import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,6 +78,11 @@ public class SesionCajaService implements GestionarCajaUseCase {
                             "Ya tienes una caja abierta. Cierra tu caja actual antes de abrir una nueva.");
                 });
 
+        sesionCajaRepository.findAbiertaBySedeAndTipo(command.getIdSede(), command.getTipo())
+                .ifPresent(s -> {
+                    throw new ValidationException(mensajeCajaYaAbiertaEnSede(s));
+                });
+
         BigDecimal saldoInicial = command.getSaldoInicial() != null
                 ? command.getSaldoInicial() : BigDecimal.ZERO;
         if (saldoInicial.compareTo(BigDecimal.ZERO) < 0) {
@@ -94,7 +101,15 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .observaciones(command.getObservaciones())
                 .build();
 
-        SesionCajaQuery resultado = toQuery(sesionCajaRepository.save(sesion));
+        SesionCaja guardada;
+        try {
+            guardada = sesionCajaRepository.save(sesion);
+        } catch (DataIntegrityViolationException e) {
+            throw new ValidationException(
+                    "No se pudo abrir la caja: ya existe una sesion abierta para tu usuario o para esta sede. "
+                            + "Actualiza la pagina e intenta nuevamente.");
+        }
+        SesionCajaQuery resultado = toQuery(guardada);
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 command.getIdUsuarioApertura(), AuditoriaConstants.ACCION_ABRIR, AuditoriaConstants.MOD_CAJA,
                 "SesionCaja", resultado.getId(),
@@ -244,6 +259,13 @@ public class SesionCajaService implements GestionarCajaUseCase {
                     "La caja fue cerrada mientras se registraba el movimiento. Intenta nuevamente.");
         }
 
+        auditoria.ejecutar(new RegistrarLogUseCase.Command(
+                command.getIdUsuarioRegistra(), AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_CAJA,
+                "MovimientoCaja", guardado.getId(),
+                null, command.getTipo().name() + "=" + command.getMonto(),
+                "Movimiento manual registrado en caja #" + sesion.getId() + " | " + command.getConcepto(),
+                null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+
         notificarSiMovimientoGrande(sesion.getIdSede(), command.getTipo().toString(),
                 command.getMonto(), command.getConcepto());
 
@@ -320,6 +342,14 @@ public class SesionCajaService implements GestionarCajaUseCase {
         BigDecimal saldoEsperado = sesion.calcularSaldoEsperado();
         BigDecimal diferencia    = command.getSaldoContado().subtract(saldoEsperado);
 
+        BigDecimal umbral = umbralDiferencia();
+        boolean sinObservaciones = command.getObservaciones() == null || command.getObservaciones().isBlank();
+        if (diferencia.abs().compareTo(umbral) > 0 && sinObservaciones) {
+            throw new ValidationException(
+                    "La diferencia del arqueo (S/ " + diferencia.toPlainString()
+                            + ") supera el umbral permitido. Registra una observacion que la justifique.");
+        }
+
         ArqueoCaja arqueo = ArqueoCaja.builder()
                 .idSesionCaja(command.getIdSesionCaja())
                 .saldoEsperado(saldoEsperado)
@@ -335,6 +365,13 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 null, "contado=" + command.getSaldoContado() + " | diferencia=" + diferencia,
                 "Arqueo en caja #" + command.getIdSesionCaja() + " | diferencia=" + diferencia,
                 null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
+
+        if (diferencia.abs().compareTo(umbral) > 0) {
+            notificarAdmins("CAJA_ARQUEO_DISCREPANCIA", Map.of(
+                    "sede", nombreSede(sesion.getIdSede()),
+                    "diferencia", diferencia.toPlainString()));
+        }
+
         return resultado;
     }
 
@@ -426,6 +463,15 @@ public class SesionCajaService implements GestionarCajaUseCase {
 
     private String nombreSede(Long idSede) {
         return sedeRepository.findById(idSede).map(Sede::getNombre).orElse("Sede #" + idSede);
+    }
+
+    private String mensajeCajaYaAbiertaEnSede(SesionCaja sesion) {
+        String hora = sesion.getFechaApertura() != null
+                ? sesion.getFechaApertura().atZoneSameInstant(LIMA)
+                        .format(DateTimeFormatter.ofPattern("HH:mm"))
+                : "una fecha anterior";
+        return "Ya existe una caja " + sesion.getTipo() + " abierta en esta sede, a cargo de "
+                + nombreUsuario(sesion.getUsuarioId()) + " desde las " + hora + ".";
     }
 
     private String nombreUsuario(UUID usuarioId) {

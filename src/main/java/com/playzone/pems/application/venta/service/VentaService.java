@@ -26,6 +26,7 @@ import com.playzone.pems.domain.evento.repository.ReservaPublicaRepository;
 import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,8 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -56,6 +59,15 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
     @Override
     @Transactional
     public VentaQuery cobrarReserva(CobrarReservaCommand command) {
+        String idempotencyKey = normalizarIdempotencyKey(command.getIdempotencyKey());
+        if (idempotencyKey != null) {
+            Optional<Venta> ventaExistente =
+                    ventaRepository.findByCreatedByAndIdempotencyKey(command.getCreatedBy(), idempotencyKey);
+            if (ventaExistente.isPresent()) {
+                return toQuery(ventaExistente.get());
+            }
+        }
+
         ReservaPublica reserva = reservaPublicaRepository.findById(command.getReservaId())
                 .orElseThrow(() -> new ValidationException("Reserva no encontrada."));
 
@@ -98,6 +110,7 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
                     .actaFirmada(command.isActaFirmada())
                     .esAnticipada(reserva.getFechaEvento().isAfter(LocalDate.now(zoneId)))
                     .notas(command.getNotas())
+                    .idempotencyKey(idempotencyKey)
                     .build();
         } else {
             venta = Venta.builder()
@@ -116,11 +129,22 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
                     .actaFirmada(command.isActaFirmada())
                     .esAnticipada(reserva.getFechaEvento().isAfter(LocalDate.now(zoneId)))
                     .notas(command.getNotas())
+                    .idempotencyKey(idempotencyKey)
                     .createdBy(command.getCreatedBy())
                     .build();
         }
 
-        Venta ventaGuardada = ventaRepository.save(venta);
+        Venta ventaGuardada;
+        try {
+            ventaGuardada = ventaRepository.save(venta);
+        } catch (DataIntegrityViolationException e) {
+            if (idempotencyKey == null) {
+                throw e;
+            }
+            return ventaRepository.findByCreatedByAndIdempotencyKey(command.getCreatedBy(), idempotencyKey)
+                    .map(this::toQuery)
+                    .orElseThrow(() -> e);
+        }
         ventaPagoRepository.deleteByVentaId(ventaGuardada.getId());
 
         for (PagoMostradorCommand pagoCmd : command.getPagos()) {
@@ -302,15 +326,29 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
     @Override
     @Transactional(readOnly = true)
     public Page<VentaQuery> consultarPorSedeYFechas(
-            Long idSede, LocalDate desde, LocalDate hasta, String search, Pageable pageable) {
+            Long idSede, LocalDate desde, LocalDate hasta, String search, UUID usuarioId, Pageable pageable) {
         OffsetDateTime inicio = desde.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime fin    = hasta.atTime(LocalTime.MAX).atOffset(ZoneOffset.UTC);
-        if (search != null && !search.trim().isEmpty()) {
-            return ventaRepository.findBySedeAndFechasBetweenAndSearch(idSede, inicio, fin, search.trim(), pageable)
-                    .map(this::toQuery);
+        boolean tieneBusqueda = search != null && !search.trim().isEmpty();
+
+        if (usuarioId != null) {
+            return tieneBusqueda
+                    ? ventaRepository.findBySedeAndFechasBetweenAndUsuarioAndSearch(
+                            idSede, inicio, fin, usuarioId, search.trim(), pageable)
+                            .map(this::toQuery)
+                    : ventaRepository.findBySedeAndFechasBetweenAndUsuario(idSede, inicio, fin, usuarioId, pageable)
+                            .map(this::toQuery);
         }
-        return ventaRepository.findBySedeAndFechasBetween(idSede, inicio, fin, pageable)
-                .map(this::toQuery);
+
+        return tieneBusqueda
+                ? ventaRepository.findBySedeAndFechasBetweenAndSearch(idSede, inicio, fin, search.trim(), pageable)
+                        .map(this::toQuery)
+                : ventaRepository.findBySedeAndFechasBetween(idSede, inicio, fin, pageable)
+                        .map(this::toQuery);
+    }
+
+    private String normalizarIdempotencyKey(String idempotencyKey) {
+        return (idempotencyKey == null || idempotencyKey.isBlank()) ? null : idempotencyKey.trim();
     }
 
     private VentaQuery toQuery(Venta v) {

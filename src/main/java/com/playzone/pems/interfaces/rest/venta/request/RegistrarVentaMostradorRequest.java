@@ -58,6 +58,9 @@ public class RegistrarVentaMostradorRequest {
 
     private String notas;
 
+    @Size(max = 100)
+    private String idempotencyKey;
+
     public RegistrarVentaMostradorCommand toCommand() {
         List<NinoMostradorCommand> ninosCmd = ninos.stream()
                 .map(n -> NinoMostradorCommand.builder()
@@ -89,6 +92,7 @@ public class RegistrarVentaMostradorRequest {
                 .efectivoRecibido(efectivoRecibido)
                 .actaFirmada(actaFirmada)
                 .notas(notas)
+                .idempotencyKey(idempotencyKey)
                 .build();
     }
 
