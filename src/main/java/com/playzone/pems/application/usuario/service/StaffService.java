@@ -19,6 +19,8 @@ import com.playzone.pems.application.usuario.port.in.ObtenerUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.RegistrarUsuarioAdminUseCase;
 import com.playzone.pems.application.usuario.port.in.ResetPasswordAdminUseCase;
 import com.playzone.pems.application.usuario.port.out.SupabaseAuthPort;
+import com.playzone.pems.domain.finanzas.model.SesionCaja;
+import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.domain.usuario.model.PerfilUsuario;
 import com.playzone.pems.domain.usuario.model.Sede;
 import com.playzone.pems.domain.usuario.model.StaffPerfil;
@@ -84,6 +86,7 @@ public class StaffService implements
     private final SupabaseAuthPort         supabaseAuthPort;
     private final CrearNotificacionPort    crearNotificacionPort;
     private final ResolverAdministradoresPort resolverAdministradoresPort;
+    private final SesionCajaRepository     sesionCajaRepository;
     private final SupabaseAuthFacade       authFacade;
     private final RegistrarLogUseCase      auditoria;
     private final ObjectMapper             objectMapper;
@@ -436,6 +439,24 @@ public class StaffService implements
         notificarSeguridadStaff("USUARIO_BLOQUEADO", staff.getUsuarioId(), Map.of(
                 "nombre", nombreStaff(staff.getUsuarioId()),
                 "motivo", "Cuenta desactivada por un administrador."));
+
+        sesionCajaRepository.findAbiertaByUsuario(staff.getUsuarioId()).ifPresent(sesion ->
+                notificarCajaAbiertaDeStaffInactivo(staff.getUsuarioId(), sesion));
+    }
+
+    private void notificarCajaAbiertaDeStaffInactivo(UUID usuarioId, SesionCaja sesion) {
+        Map<String, String> datosExtra = Map.of(
+                "usuario", nombreStaff(usuarioId),
+                "tipo", sesion.getTipo().toString(),
+                "sede", sedeRepository.findById(sesion.getIdSede()).map(Sede::getNombre)
+                        .orElse("Sede #" + sesion.getIdSede()));
+        for (UUID adminId : resolverAdministradoresPort.obtenerIdsAdministradoresActivos()) {
+            crearNotificacionPort.notificarTransaccional(CrearNotificacionCommand.builder()
+                    .tipoCodigo("CAJA_STAFF_INACTIVO_CON_SESION")
+                    .destinatarioUsuarioId(adminId)
+                    .datosExtra(datosExtra)
+                    .build());
+        }
     }
 
 

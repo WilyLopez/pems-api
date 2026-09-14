@@ -8,6 +8,7 @@ import com.playzone.pems.application.notificacion.port.out.ResolverAdministrador
 import com.playzone.pems.application.usuario.dto.command.RegistrarUsuarioAdminCommand;
 import com.playzone.pems.application.usuario.dto.response.UsuarioAdminResponse;
 import com.playzone.pems.application.usuario.port.out.SupabaseAuthPort;
+import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.domain.usuario.model.Sede;
 import com.playzone.pems.domain.usuario.model.StaffPerfil;
 import com.playzone.pems.domain.usuario.model.StaffToken;
@@ -46,6 +47,7 @@ class StaffServiceTest {
     @Mock private SupabaseAuthPort supabaseAuthPort;
     @Mock private CrearNotificacionPort crearNotificacionPort;
     @Mock private ResolverAdministradoresPort resolverAdministradoresPort;
+    @Mock private SesionCajaRepository sesionCajaRepository;
     @Mock private SupabaseAuthFacade authFacade;
     @Mock private RegistrarLogUseCase auditoria;
 
@@ -56,7 +58,7 @@ class StaffServiceTest {
         service = new StaffService(
                 staffPerfilRepository, perfilUsuarioRepository, sedeRepository, usuarioRolRepository,
                 staffTokenRepository, supabaseAuthPort, crearNotificacionPort, resolverAdministradoresPort,
-                authFacade, auditoria, new ObjectMapper());
+                sesionCajaRepository, authFacade, auditoria, new ObjectMapper());
     }
 
     private RegistrarUsuarioAdminCommand comandoCajero() {
