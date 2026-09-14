@@ -468,6 +468,7 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .nombreCajero(nombreUsuario(sesion.getUsuarioId()))
                 .tipo(sesion.getTipo())
                 .estado(sesion.getEstado())
+                .fecha(fechaDe(sesion))
                 .saldoInicial(sesion.getSaldoInicial())
                 .totalIngresos(sesion.getTotalIngresos())
                 .totalEgresos(sesion.getTotalEgresos())

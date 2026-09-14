@@ -313,6 +313,7 @@ public class CajaController {
                 .nombreCajero(q.getNombreCajero())
                 .tipo(q.getTipo())
                 .estado(q.getEstado())
+                .fecha(q.getFecha())
                 .saldoInicial(q.getSaldoInicial())
                 .totalIngresos(q.getTotalIngresos())
                 .totalEgresos(q.getTotalEgresos())

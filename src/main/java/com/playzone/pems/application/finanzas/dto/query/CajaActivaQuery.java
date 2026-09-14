@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ public class CajaActivaQuery {
     private String                     nombreCajero;
     private TipoSesionCaja             tipo;
     private EstadoCaja                 estado;
+    private LocalDate                  fecha;
     private BigDecimal                 saldoInicial;
     private BigDecimal                 totalIngresos;
     private BigDecimal                 totalEgresos;
