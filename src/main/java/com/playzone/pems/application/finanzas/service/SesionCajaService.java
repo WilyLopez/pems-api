@@ -78,7 +78,7 @@ public class SesionCajaService implements GestionarCajaUseCase {
                             "Ya tienes una caja abierta. Cierra tu caja actual antes de abrir una nueva.");
                 });
 
-        sesionCajaRepository.findAbiertaBySedeAndTipo(command.getIdSede(), command.getTipo())
+        sesionCajaRepository.findAbiertaBySede(command.getIdSede())
                 .ifPresent(s -> {
                     throw new ValidationException(mensajeCajaYaAbiertaEnSede(s));
                 });
