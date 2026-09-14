@@ -6,6 +6,7 @@ import com.playzone.pems.application.finanzas.dto.command.CerrarCajaCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarArqueoCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarMovimientoManualCommand;
 import com.playzone.pems.application.finanzas.dto.query.ArqueoCajaQuery;
+import com.playzone.pems.application.finanzas.dto.query.CajaActivaQuery;
 import com.playzone.pems.application.finanzas.dto.query.MovimientoCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.ResumenCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.SesionCajaQuery;
@@ -29,4 +30,5 @@ public interface GestionarCajaUseCase {
     ArqueoCajaQuery registrarArqueo(RegistrarArqueoCommand command);
     List<ArqueoCajaQuery> listarArqueos(Long idSesionCaja);
     ResumenCajaQuery generarResumen(Long idSesionCaja);
+    Optional<CajaActivaQuery> obtenerCajaActiva(Long idSede);
 }

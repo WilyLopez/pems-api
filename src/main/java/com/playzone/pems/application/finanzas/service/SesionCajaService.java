@@ -8,6 +8,7 @@ import com.playzone.pems.application.finanzas.dto.command.CerrarCajaCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarArqueoCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarMovimientoManualCommand;
 import com.playzone.pems.application.finanzas.dto.query.ArqueoCajaQuery;
+import com.playzone.pems.application.finanzas.dto.query.CajaActivaQuery;
 import com.playzone.pems.application.finanzas.dto.query.MovimientoCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.ResumenCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.SesionCajaQuery;
@@ -32,11 +33,16 @@ import com.playzone.pems.domain.usuario.model.PerfilUsuario;
 import com.playzone.pems.domain.usuario.model.Sede;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
+import com.playzone.pems.domain.venta.model.Venta;
+import com.playzone.pems.domain.venta.model.VentaPago;
+import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
+import com.playzone.pems.domain.venta.repository.VentaRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +53,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,6 +80,8 @@ public class SesionCajaService implements GestionarCajaUseCase {
     private final ResolverAdministradoresPort     resolverAdministradoresPort;
     private final PerfilUsuarioRepository         perfilUsuarioRepository;
     private final SedeRepository                  sedeRepository;
+    private final VentaRepository                 ventaRepository;
+    private final VentaPagoRepository             ventaPagoRepository;
 
     @Override
     public SesionCajaQuery abrir(AbrirCajaCommand command) {
@@ -417,6 +426,58 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .fechaApertura(sesion.getFechaApertura())
                 .fechaCierre(sesion.getFechaCierre())
                 .observaciones(sesion.getObservaciones())
+                .movimientos(movimientos)
+                .arqueos(arqueos)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<CajaActivaQuery> obtenerCajaActiva(Long idSede) {
+        return sesionCajaRepository.findAbiertaBySede(idSede).map(this::toCajaActivaQuery);
+    }
+
+    private CajaActivaQuery toCajaActivaQuery(SesionCaja sesion) {
+        OffsetDateTime desde = sesion.getFechaApertura();
+        OffsetDateTime hasta = OffsetDateTime.now(LIMA);
+
+        List<Venta> ventas = desde != null
+                ? ventaRepository.findBySedeAndFechasBetween(sesion.getIdSede(), desde, hasta, Pageable.unpaged())
+                        .getContent()
+                : List.of();
+
+        BigDecimal totalVendido = ventas.stream().map(Venta::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, BigDecimal> desglosePorMedioPago = new LinkedHashMap<>();
+        for (Venta venta : ventas) {
+            for (VentaPago pago : ventaPagoRepository.findByVentaId(venta.getId())) {
+                if (!pago.isEsValidado()) continue;
+                desglosePorMedioPago.merge(pago.getMedioPagoCodigo(), pago.getMonto(), BigDecimal::add);
+            }
+        }
+
+        List<MovimientoCajaQuery> movimientos = movimientoCajaRepository.findBySesion(sesion.getId())
+                .stream().map(this::toMovimientoQuery).toList();
+        List<ArqueoCajaQuery> arqueos = arqueoCajaRepository.findBySesion(sesion.getId())
+                .stream().map(this::toArqueoQuery).toList();
+
+        return CajaActivaQuery.builder()
+                .id(sesion.getId())
+                .idSede(sesion.getIdSede())
+                .usuarioId(sesion.getUsuarioId())
+                .nombreCajero(nombreUsuario(sesion.getUsuarioId()))
+                .tipo(sesion.getTipo())
+                .estado(sesion.getEstado())
+                .saldoInicial(sesion.getSaldoInicial())
+                .totalIngresos(sesion.getTotalIngresos())
+                .totalEgresos(sesion.getTotalEgresos())
+                .saldoEsperado(sesion.getSaldoEsperado() != null
+                        ? sesion.getSaldoEsperado() : sesion.calcularSaldoEsperado())
+                .fechaApertura(sesion.getFechaApertura())
+                .observaciones(sesion.getObservaciones())
+                .cantidadVentas(ventas.size())
+                .totalVendido(totalVendido)
+                .desglosePorMedioPago(desglosePorMedioPago)
                 .movimientos(movimientos)
                 .arqueos(arqueos)
                 .build();

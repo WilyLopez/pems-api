@@ -21,6 +21,8 @@ import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.domain.usuario.model.Sede;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
+import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
+import com.playzone.pems.domain.venta.repository.VentaRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,8 @@ class SesionCajaServiceTest {
     @Mock private ResolverAdministradoresPort resolverAdministradoresPort;
     @Mock private PerfilUsuarioRepository perfilUsuarioRepository;
     @Mock private SedeRepository sedeRepository;
+    @Mock private VentaRepository ventaRepository;
+    @Mock private VentaPagoRepository ventaPagoRepository;
 
     private SesionCajaService service;
 
@@ -60,7 +64,8 @@ class SesionCajaServiceTest {
         service = new SesionCajaService(
                 sesionCajaRepository, movimientoCajaRepository, arqueoCajaRepository,
                 configuracionGlobalRepository, configuracionCalendarioRepository, authFacade, auditoria,
-                crearNotificacionPort, resolverAdministradoresPort, perfilUsuarioRepository, sedeRepository);
+                crearNotificacionPort, resolverAdministradoresPort, perfilUsuarioRepository, sedeRepository,
+                ventaRepository, ventaPagoRepository);
     }
 
     @Test
