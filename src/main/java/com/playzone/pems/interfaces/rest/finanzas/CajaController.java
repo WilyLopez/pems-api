@@ -205,7 +205,7 @@ public class CajaController {
     }
 
     @GetMapping("/sedes/{idSede}/activa")
-    @PreAuthorize("hasAuthority('caja.ver_historial')")
+    @PreAuthorize("hasAuthority('caja.ver_historial') or hasAuthority('caja.abrir') or hasAuthority('caja.movimiento')")
     public ResponseEntity<ApiResponse<CajaActivaResponse>> cajaActiva(@PathVariable Long idSede) {
         sedeScope.validarAcceso(idSede);
         return ResponseEntity.ok(ApiResponse.ok(
