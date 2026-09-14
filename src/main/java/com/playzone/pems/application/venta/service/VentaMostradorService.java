@@ -74,9 +74,9 @@ public class VentaMostradorService {
             }
         }
 
-        if (sesionCajaRepository.findAbiertaByUsuarioAndSede(usuarioActual, cmd.getSedeId()).isEmpty()) {
+        if (sesionCajaRepository.findAbiertaBySede(cmd.getSedeId()).isEmpty()) {
             throw new ValidationException(
-                    "No tienes una caja abierta en la sede indicada. Abre tu caja antes de registrar ventas.");
+                    "No hay una caja abierta en la sede indicada. Abre la caja antes de registrar ventas.");
         }
 
         java.time.ZoneId zoneId = java.time.ZoneId.of("America/Lima");
