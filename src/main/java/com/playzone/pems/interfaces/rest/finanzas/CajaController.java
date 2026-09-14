@@ -6,11 +6,11 @@ import com.playzone.pems.application.finanzas.dto.command.CerrarCajaCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarArqueoCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarMovimientoManualCommand;
 import com.playzone.pems.application.finanzas.dto.query.ArqueoCajaQuery;
+import com.playzone.pems.application.finanzas.dto.query.CajaActivaQuery;
 import com.playzone.pems.application.finanzas.dto.query.MovimientoCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.ResumenCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.SesionCajaQuery;
 import com.playzone.pems.application.finanzas.port.in.GestionarCajaUseCase;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.infrastructure.security.SedeScopeValidator;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.interfaces.rest.finanzas.request.AbrirCajaRequest;
@@ -20,6 +20,7 @@ import com.playzone.pems.interfaces.rest.finanzas.request.CerrarCajaRequest;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarArqueoRequest;
 import com.playzone.pems.interfaces.rest.finanzas.request.RegistrarMovimientoManualRequest;
 import com.playzone.pems.interfaces.rest.finanzas.response.ArqueoCajaResponse;
+import com.playzone.pems.interfaces.rest.finanzas.response.CajaActivaResponse;
 import com.playzone.pems.interfaces.rest.finanzas.response.MovimientoCajaResponse;
 import com.playzone.pems.interfaces.rest.finanzas.response.ResumenCajaResponse;
 import com.playzone.pems.interfaces.rest.finanzas.response.SesionCajaResponse;
@@ -55,7 +56,6 @@ public class CajaController {
         UUID usuario = usuarioActual();
         SesionCajaQuery query = useCase.abrir(AbrirCajaCommand.builder()
                 .idSede(idSede)
-                .tipo(tipoSesionDelUsuario())
                 .saldoInicial(request.getSaldoInicial())
                 .idUsuarioApertura(usuario)
                 .observaciones(request.getObservaciones())
@@ -204,6 +204,14 @@ public class CajaController {
         return ResponseEntity.ok(ApiResponse.ok(toResumenResponse(query)));
     }
 
+    @GetMapping("/sedes/{idSede}/activa")
+    @PreAuthorize("hasAuthority('caja.ver_historial')")
+    public ResponseEntity<ApiResponse<CajaActivaResponse>> cajaActiva(@PathVariable Long idSede) {
+        sedeScope.validarAcceso(idSede);
+        return ResponseEntity.ok(ApiResponse.ok(
+                useCase.obtenerCajaActiva(idSede).map(this::toActivaResponse).orElse(null)));
+    }
+
     private UUID usuarioActual() {
         return supabaseAuthFacade.usuarioActualId()
                 .orElseThrow(() -> new ValidationException("Sesion de usuario requerida."));
@@ -213,16 +221,11 @@ public class CajaController {
         return supabaseAuthFacade.tieneRol("SUPERADMIN") || supabaseAuthFacade.tieneRol("ADMIN");
     }
 
-    private TipoSesionCaja tipoSesionDelUsuario() {
-        return esAdmin() ? TipoSesionCaja.ADMINISTRATIVA : TipoSesionCaja.CAJERO;
-    }
-
     private SesionCajaResponse toResponse(SesionCajaQuery q) {
         return SesionCajaResponse.builder()
                 .id(q.getId())
                 .idSede(q.getIdSede())
                 .usuarioId(q.getUsuarioId())
-                .tipo(q.getTipo())
                 .fecha(q.getFecha())
                 .saldoInicial(q.getSaldoInicial())
                 .saldoFinal(q.getSaldoFinal())
@@ -276,7 +279,6 @@ public class CajaController {
                 .id(q.getId())
                 .idSede(q.getIdSede())
                 .usuarioId(q.getUsuarioId())
-                .tipo(q.getTipo())
                 .fecha(q.getFecha())
                 .saldoInicial(q.getSaldoInicial())
                 .totalIngresos(q.getTotalIngresos())
@@ -288,6 +290,30 @@ public class CajaController {
                 .fechaApertura(q.getFechaApertura())
                 .fechaCierre(q.getFechaCierre())
                 .observaciones(q.getObservaciones())
+                .movimientos(q.getMovimientos() != null
+                        ? q.getMovimientos().stream().map(this::toMovimientoResponse).toList() : null)
+                .arqueos(q.getArqueos() != null
+                        ? q.getArqueos().stream().map(this::toArqueoResponse).toList() : null)
+                .build();
+    }
+
+    private CajaActivaResponse toActivaResponse(CajaActivaQuery q) {
+        return CajaActivaResponse.builder()
+                .id(q.getId())
+                .idSede(q.getIdSede())
+                .usuarioId(q.getUsuarioId())
+                .nombreCajero(q.getNombreCajero())
+                .estado(q.getEstado())
+                .fecha(q.getFecha())
+                .saldoInicial(q.getSaldoInicial())
+                .totalIngresos(q.getTotalIngresos())
+                .totalEgresos(q.getTotalEgresos())
+                .saldoEsperado(q.getSaldoEsperado())
+                .fechaApertura(q.getFechaApertura())
+                .observaciones(q.getObservaciones())
+                .cantidadVentas(q.getCantidadVentas())
+                .totalVendido(q.getTotalVendido())
+                .desglosePorMedioPago(q.getDesglosePorMedioPago())
                 .movimientos(q.getMovimientos() != null
                         ? q.getMovimientos().stream().map(this::toMovimientoResponse).toList() : null)
                 .arqueos(q.getArqueos() != null

@@ -8,18 +8,20 @@ import com.playzone.pems.application.finanzas.dto.command.RegistrarMovimientoMan
 import com.playzone.pems.application.notificacion.dto.command.CrearNotificacionCommand;
 import com.playzone.pems.application.notificacion.port.out.CrearNotificacionPort;
 import com.playzone.pems.application.notificacion.port.out.ResolverAdministradoresPort;
+import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.domain.configuracion.repository.ConfiguracionGlobalRepository;
 import com.playzone.pems.domain.finanzas.model.MovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.SesionCaja;
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.domain.finanzas.repository.ArqueoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.MovimientoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.domain.usuario.model.Sede;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
+import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
+import com.playzone.pems.domain.venta.repository.VentaRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,12 +46,15 @@ class SesionCajaServiceTest {
     @Mock private MovimientoCajaRepository movimientoCajaRepository;
     @Mock private ArqueoCajaRepository arqueoCajaRepository;
     @Mock private ConfiguracionGlobalRepository configuracionGlobalRepository;
+    @Mock private ConfiguracionCalendarioRepository configuracionCalendarioRepository;
     @Mock private SupabaseAuthFacade authFacade;
     @Mock private RegistrarLogUseCase auditoria;
     @Mock private CrearNotificacionPort crearNotificacionPort;
     @Mock private ResolverAdministradoresPort resolverAdministradoresPort;
     @Mock private PerfilUsuarioRepository perfilUsuarioRepository;
     @Mock private SedeRepository sedeRepository;
+    @Mock private VentaRepository ventaRepository;
+    @Mock private VentaPagoRepository ventaPagoRepository;
 
     private SesionCajaService service;
 
@@ -57,8 +62,9 @@ class SesionCajaServiceTest {
     void setUp() {
         service = new SesionCajaService(
                 sesionCajaRepository, movimientoCajaRepository, arqueoCajaRepository,
-                configuracionGlobalRepository, authFacade, auditoria,
-                crearNotificacionPort, resolverAdministradoresPort, perfilUsuarioRepository, sedeRepository);
+                configuracionGlobalRepository, configuracionCalendarioRepository, authFacade, auditoria,
+                crearNotificacionPort, resolverAdministradoresPort, perfilUsuarioRepository, sedeRepository,
+                ventaRepository, ventaPagoRepository);
     }
 
     @Test
@@ -74,7 +80,7 @@ class SesionCajaServiceTest {
         when(resolverAdministradoresPort.obtenerIdsAdministradoresActivos()).thenReturn(List.of(adminId));
 
         AbrirCajaCommand comando = AbrirCajaCommand.builder()
-                .idSede(1L).tipo(TipoSesionCaja.CAJERO).saldoInicial(new BigDecimal("100.00"))
+                .idSede(1L).saldoInicial(new BigDecimal("100.00"))
                 .idUsuarioApertura(usuarioId).build();
 
         service.abrir(comando);

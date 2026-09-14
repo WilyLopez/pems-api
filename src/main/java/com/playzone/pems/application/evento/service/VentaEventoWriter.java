@@ -41,7 +41,7 @@ public class VentaEventoWriter {
                 .build());
     }
 
-    public void registrarPagos(Long ventaId, List<VentaPagoItem> pagos, UUID idUsuario) {
+    public void registrarPagos(Long idSede, Long ventaId, List<VentaPagoItem> pagos, UUID idUsuario) {
         pagos.forEach(p -> {
             ventaPagoRepository.save(VentaPago.builder()
                     .ventaId(ventaId)
@@ -52,7 +52,7 @@ public class VentaEventoWriter {
                     .validadoAt(OffsetDateTime.now())
                     .build());
             enrutadorCajaService.registrarIngresoEfectivoAdministrativo(
-                    idUsuario, p.getMedioPagoCodigo(), p.getMonto(),
+                    idSede, idUsuario, p.getMedioPagoCodigo(), p.getMonto(),
                     "Cobro evento venta #" + ventaId, ventaId);
         });
     }

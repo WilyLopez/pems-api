@@ -2,7 +2,6 @@ package com.playzone.pems.infrastructure.persistence.finanzas.adapter;
 
 import com.playzone.pems.domain.finanzas.model.SesionCaja;
 import com.playzone.pems.domain.finanzas.model.enums.EstadoCaja;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.infrastructure.persistence.finanzas.entity.SesionCajaEntity;
 import com.playzone.pems.infrastructure.persistence.finanzas.jpa.SesionCajaJpaRepository;
@@ -61,8 +60,8 @@ public class SesionCajaPersistenceAdapter implements SesionCajaRepository {
     }
 
     @Override
-    public Optional<SesionCaja> findAbiertaBySedeAndTipo(Long idSede, TipoSesionCaja tipo) {
-        return jpaRepository.findBySede_IdAndTipoAndEstado(idSede, tipo, EstadoCaja.ABIERTA).map(this::toDomain);
+    public Optional<SesionCaja> findAbiertaBySede(Long idSede) {
+        return jpaRepository.findBySede_IdAndEstado(idSede, EstadoCaja.ABIERTA).map(this::toDomain);
     }
 
     @Override
@@ -106,7 +105,6 @@ public class SesionCajaPersistenceAdapter implements SesionCajaRepository {
             entity = SesionCajaEntity.builder()
                     .sede(sede)
                     .usuarioId(sesion.getUsuarioId())
-                    .tipo(sesion.getTipo())
                     .estado(sesion.getEstado())
                     .saldoInicial(sesion.getSaldoInicial())
                     .totalIngresos(sesion.getTotalIngresos())
@@ -141,7 +139,6 @@ public class SesionCajaPersistenceAdapter implements SesionCajaRepository {
                 .id(e.getId())
                 .idSede(e.getSede().getId())
                 .usuarioId(e.getUsuarioId())
-                .tipo(e.getTipo())
                 .estado(e.getEstado())
                 .saldoInicial(e.getSaldoInicial())
                 .totalIngresos(e.getTotalIngresos())

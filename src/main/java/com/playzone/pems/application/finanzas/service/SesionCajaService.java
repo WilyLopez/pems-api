@@ -8,6 +8,7 @@ import com.playzone.pems.application.finanzas.dto.command.CerrarCajaCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarArqueoCommand;
 import com.playzone.pems.application.finanzas.dto.command.RegistrarMovimientoManualCommand;
 import com.playzone.pems.application.finanzas.dto.query.ArqueoCajaQuery;
+import com.playzone.pems.application.finanzas.dto.query.CajaActivaQuery;
 import com.playzone.pems.application.finanzas.dto.query.MovimientoCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.ResumenCajaQuery;
 import com.playzone.pems.application.finanzas.dto.query.SesionCajaQuery;
@@ -23,6 +24,8 @@ import com.playzone.pems.domain.finanzas.model.enums.NaturalezaMovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
 import com.playzone.pems.domain.finanzas.repository.ArqueoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.MovimientoCajaRepository;
+import com.playzone.pems.domain.calendario.model.ConfiguracionCalendario;
+import com.playzone.pems.domain.calendario.repository.ConfiguracionCalendarioRepository;
 import com.playzone.pems.domain.configuracion.model.ConfiguracionGlobal;
 import com.playzone.pems.domain.configuracion.repository.ConfiguracionGlobalRepository;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
@@ -30,20 +33,27 @@ import com.playzone.pems.domain.usuario.model.PerfilUsuario;
 import com.playzone.pems.domain.usuario.model.Sede;
 import com.playzone.pems.domain.usuario.repository.PerfilUsuarioRepository;
 import com.playzone.pems.domain.usuario.repository.SedeRepository;
+import com.playzone.pems.domain.venta.model.Venta;
+import com.playzone.pems.domain.venta.model.VentaPago;
+import com.playzone.pems.domain.venta.repository.VentaPagoRepository;
+import com.playzone.pems.domain.venta.repository.VentaRepository;
 import com.playzone.pems.infrastructure.security.SupabaseAuthFacade;
 import com.playzone.pems.shared.exception.ResourceNotFoundException;
 import com.playzone.pems.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,16 +69,19 @@ public class SesionCajaService implements GestionarCajaUseCase {
     private static final String CLAVE_MONTO_MOVIMIENTO_GRANDE = "CAJA_MONTO_MOVIMIENTO_GRANDE";
     private static final BigDecimal MONTO_MOVIMIENTO_GRANDE_DEFECTO = new BigDecimal("500");
 
-    private final SesionCajaRepository           sesionCajaRepository;
-    private final MovimientoCajaRepository       movimientoCajaRepository;
-    private final ArqueoCajaRepository           arqueoCajaRepository;
-    private final ConfiguracionGlobalRepository  configuracionGlobalRepository;
-    private final SupabaseAuthFacade             authFacade;
-    private final RegistrarLogUseCase            auditoria;
-    private final CrearNotificacionPort          crearNotificacionPort;
-    private final ResolverAdministradoresPort    resolverAdministradoresPort;
-    private final PerfilUsuarioRepository        perfilUsuarioRepository;
-    private final SedeRepository                 sedeRepository;
+    private final SesionCajaRepository            sesionCajaRepository;
+    private final MovimientoCajaRepository        movimientoCajaRepository;
+    private final ArqueoCajaRepository            arqueoCajaRepository;
+    private final ConfiguracionGlobalRepository   configuracionGlobalRepository;
+    private final ConfiguracionCalendarioRepository configuracionCalendarioRepository;
+    private final SupabaseAuthFacade              authFacade;
+    private final RegistrarLogUseCase             auditoria;
+    private final CrearNotificacionPort           crearNotificacionPort;
+    private final ResolverAdministradoresPort     resolverAdministradoresPort;
+    private final PerfilUsuarioRepository         perfilUsuarioRepository;
+    private final SedeRepository                  sedeRepository;
+    private final VentaRepository                 ventaRepository;
+    private final VentaPagoRepository             ventaPagoRepository;
 
     @Override
     public SesionCajaQuery abrir(AbrirCajaCommand command) {
@@ -78,10 +91,12 @@ public class SesionCajaService implements GestionarCajaUseCase {
                             "Ya tienes una caja abierta. Cierra tu caja actual antes de abrir una nueva.");
                 });
 
-        sesionCajaRepository.findAbiertaBySedeAndTipo(command.getIdSede(), command.getTipo())
+        sesionCajaRepository.findAbiertaBySede(command.getIdSede())
                 .ifPresent(s -> {
                     throw new ValidationException(mensajeCajaYaAbiertaEnSede(s));
                 });
+
+        validarHorarioApertura(command.getIdSede());
 
         BigDecimal saldoInicial = command.getSaldoInicial() != null
                 ? command.getSaldoInicial() : BigDecimal.ZERO;
@@ -92,7 +107,6 @@ public class SesionCajaService implements GestionarCajaUseCase {
         SesionCaja sesion = SesionCaja.builder()
                 .idSede(command.getIdSede())
                 .usuarioId(command.getIdUsuarioApertura())
-                .tipo(command.getTipo())
                 .estado(EstadoCaja.ABIERTA)
                 .saldoInicial(saldoInicial)
                 .totalIngresos(BigDecimal.ZERO)
@@ -113,14 +127,13 @@ public class SesionCajaService implements GestionarCajaUseCase {
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 command.getIdUsuarioApertura(), AuditoriaConstants.ACCION_ABRIR, AuditoriaConstants.MOD_CAJA,
                 "SesionCaja", resultado.getId(),
-                null, "tipo=" + command.getTipo() + " | saldoInicial=" + saldoInicial,
-                "Caja abierta (" + command.getTipo() + ") en sede #" + command.getIdSede(),
+                null, "saldoInicial=" + saldoInicial,
+                "Caja abierta en sede #" + command.getIdSede(),
                 null, null, AuditoriaConstants.NIVEL_INFO, AuditoriaConstants.RESULTADO_EXITOSO));
 
         notificarAdmins("CAJA_APERTURA", Map.of(
                 "sede", nombreSede(command.getIdSede()),
                 "usuario", nombreUsuario(command.getIdUsuarioApertura()),
-                "tipo", command.getTipo().toString(),
                 "saldoInicial", saldoInicial.toPlainString()));
 
         return resultado;
@@ -398,7 +411,6 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .id(sesion.getId())
                 .idSede(sesion.getIdSede())
                 .usuarioId(sesion.getUsuarioId())
-                .tipo(sesion.getTipo())
                 .fecha(fechaDe(sesion))
                 .saldoInicial(sesion.getSaldoInicial())
                 .totalIngresos(sesion.getTotalIngresos())
@@ -411,6 +423,58 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .fechaApertura(sesion.getFechaApertura())
                 .fechaCierre(sesion.getFechaCierre())
                 .observaciones(sesion.getObservaciones())
+                .movimientos(movimientos)
+                .arqueos(arqueos)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<CajaActivaQuery> obtenerCajaActiva(Long idSede) {
+        return sesionCajaRepository.findAbiertaBySede(idSede).map(this::toCajaActivaQuery);
+    }
+
+    private CajaActivaQuery toCajaActivaQuery(SesionCaja sesion) {
+        OffsetDateTime desde = sesion.getFechaApertura();
+        OffsetDateTime hasta = OffsetDateTime.now(LIMA);
+
+        List<Venta> ventas = desde != null
+                ? ventaRepository.findBySedeAndFechasBetween(sesion.getIdSede(), desde, hasta, Pageable.unpaged())
+                        .getContent()
+                : List.of();
+
+        BigDecimal totalVendido = ventas.stream().map(Venta::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, BigDecimal> desglosePorMedioPago = new LinkedHashMap<>();
+        for (Venta venta : ventas) {
+            for (VentaPago pago : ventaPagoRepository.findByVentaId(venta.getId())) {
+                if (!pago.isEsValidado()) continue;
+                desglosePorMedioPago.merge(pago.getMedioPagoCodigo(), pago.getMonto(), BigDecimal::add);
+            }
+        }
+
+        List<MovimientoCajaQuery> movimientos = movimientoCajaRepository.findBySesion(sesion.getId())
+                .stream().map(this::toMovimientoQuery).toList();
+        List<ArqueoCajaQuery> arqueos = arqueoCajaRepository.findBySesion(sesion.getId())
+                .stream().map(this::toArqueoQuery).toList();
+
+        return CajaActivaQuery.builder()
+                .id(sesion.getId())
+                .idSede(sesion.getIdSede())
+                .usuarioId(sesion.getUsuarioId())
+                .nombreCajero(nombreUsuario(sesion.getUsuarioId()))
+                .estado(sesion.getEstado())
+                .fecha(fechaDe(sesion))
+                .saldoInicial(sesion.getSaldoInicial())
+                .totalIngresos(sesion.getTotalIngresos())
+                .totalEgresos(sesion.getTotalEgresos())
+                .saldoEsperado(sesion.getSaldoEsperado() != null
+                        ? sesion.getSaldoEsperado() : sesion.calcularSaldoEsperado())
+                .fechaApertura(sesion.getFechaApertura())
+                .observaciones(sesion.getObservaciones())
+                .cantidadVentas(ventas.size())
+                .totalVendido(totalVendido)
+                .desglosePorMedioPago(desglosePorMedioPago)
                 .movimientos(movimientos)
                 .arqueos(arqueos)
                 .build();
@@ -465,12 +529,31 @@ public class SesionCajaService implements GestionarCajaUseCase {
         return sedeRepository.findById(idSede).map(Sede::getNombre).orElse("Sede #" + idSede);
     }
 
+    private void validarHorarioApertura(Long idSede) {
+        ConfiguracionCalendario config;
+        try {
+            config = configuracionCalendarioRepository.obtener(idSede);
+        } catch (ResourceNotFoundException e) {
+            return;
+        }
+        if (config == null || config.getHoraApertura() == null) {
+            return;
+        }
+        LocalTime ahora = OffsetDateTime.now(LIMA).toLocalTime();
+        LocalTime limiteInferior = config.getHoraApertura().minusHours(2);
+        if (ahora.isBefore(limiteInferior)) {
+            throw new ValidationException(
+                    "No se puede abrir la caja antes de las " + limiteInferior.format(DateTimeFormatter.ofPattern("HH:mm"))
+                            + " (2 horas antes de la apertura del local).");
+        }
+    }
+
     private String mensajeCajaYaAbiertaEnSede(SesionCaja sesion) {
         String hora = sesion.getFechaApertura() != null
                 ? sesion.getFechaApertura().atZoneSameInstant(LIMA)
                         .format(DateTimeFormatter.ofPattern("HH:mm"))
                 : "una fecha anterior";
-        return "Ya existe una caja " + sesion.getTipo() + " abierta en esta sede, a cargo de "
+        return "Ya existe una caja abierta en esta sede, a cargo de "
                 + nombreUsuario(sesion.getUsuarioId()) + " desde las " + hora + ".";
     }
 
@@ -503,7 +586,6 @@ public class SesionCajaService implements GestionarCajaUseCase {
                 .id(s.getId())
                 .idSede(s.getIdSede())
                 .usuarioId(s.getUsuarioId())
-                .tipo(s.getTipo())
                 .fecha(fechaDe(s))
                 .saldoInicial(s.getSaldoInicial())
                 .saldoFinal(s.getSaldoFinal())
