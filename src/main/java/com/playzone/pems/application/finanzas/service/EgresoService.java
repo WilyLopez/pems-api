@@ -87,7 +87,7 @@ public class EgresoService implements RegistrarEgresoUseCase {
         }
 
         enrutadorCajaService.registrarEgresoManualEfectivo(
-                command.getIdUsuarioRegistra(), command.getMedioPago(), command.getMonto(),
+                command.getIdSede(), command.getIdUsuarioRegistra(), command.getMedioPago(), command.getMonto(),
                 "Egreso " + tipo.getNombre() + " #" + resultado.getId(), resultado.getId());
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 command.getIdUsuarioRegistra(), AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_FINANZAS,
@@ -153,7 +153,7 @@ public class EgresoService implements RegistrarEgresoUseCase {
         TipoEgreso tipo = tipoEgresoRepository.findById(egreso.getTipoEgresoCodigo()).orElse(null);
         String nombreTipo = tipo != null ? tipo.getNombre() : egreso.getTipoEgresoCodigo();
         enrutadorCajaService.registrarEgresoManualEfectivo(
-                command.getIdUsuarioAprueba(), egreso.getMedioPago(), egreso.getMonto(),
+                egreso.getIdSede(), command.getIdUsuarioAprueba(), egreso.getMedioPago(), egreso.getMonto(),
                 "Egreso " + nombreTipo + " #" + egreso.getId() + " (aprobado)", egreso.getId());
 
         auditoria.ejecutar(new RegistrarLogUseCase.Command(

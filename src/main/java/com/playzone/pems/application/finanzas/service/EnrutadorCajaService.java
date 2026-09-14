@@ -3,7 +3,6 @@ package com.playzone.pems.application.finanzas.service;
 import com.playzone.pems.domain.finanzas.model.MovimientoCaja;
 import com.playzone.pems.domain.finanzas.model.SesionCaja;
 import com.playzone.pems.domain.finanzas.model.enums.TipoMovimientoCaja;
-import com.playzone.pems.domain.finanzas.model.enums.TipoSesionCaja;
 import com.playzone.pems.domain.finanzas.repository.MovimientoCajaRepository;
 import com.playzone.pems.domain.finanzas.repository.SesionCajaRepository;
 import com.playzone.pems.shared.exception.ValidationException;
@@ -19,62 +18,55 @@ public class EnrutadorCajaService {
 
     private static final String MEDIO_EFECTIVO = "EFECTIVO";
     private static final String MSG_SIN_CAJA =
-            "No tienes una caja abierta. Abre tu caja antes de cobrar en efectivo.";
-    private static final String MSG_SIN_CAJA_ADMINISTRATIVA =
-            "Necesitas tu Caja Administrativa abierta para registrar cobros en efectivo.";
-    private static final String MSG_SIN_CAJA_ADMINISTRATIVA_INGRESO =
-            "Necesitas tu Caja Administrativa abierta para registrar ingresos en efectivo.";
-    private static final String MSG_SIN_CAJA_ADMINISTRATIVA_EGRESO =
-            "Necesitas tu Caja Administrativa abierta para registrar egresos en efectivo.";
+            "No hay una caja abierta en esta sede. Abre una caja antes de cobrar en efectivo.";
+    private static final String MSG_SIN_CAJA_INGRESO =
+            "No hay una caja abierta en esta sede. Abre una caja antes de registrar ingresos en efectivo.";
+    private static final String MSG_SIN_CAJA_EGRESO =
+            "No hay una caja abierta en esta sede. Abre una caja antes de registrar egresos en efectivo.";
     private static final String MSG_CAJA_CERRADA_EN_OPERACION =
-            "Tu caja fue cerrada durante la operacion. Abre tu caja e intenta nuevamente.";
+            "La caja fue cerrada durante la operacion. Abre una caja e intenta nuevamente.";
 
     private final SesionCajaRepository     sesionCajaRepository;
     private final MovimientoCajaRepository movimientoCajaRepository;
 
-    public void registrarIngresoEfectivo(UUID cobrador, String medioPago, BigDecimal monto,
+    public void registrarIngresoEfectivo(Long idSede, UUID cobrador, String medioPago, BigDecimal monto,
                                          String concepto, Long ventaId) {
-        enrutar(TipoMovimientoCaja.INGRESO, cobrador, medioPago, monto, concepto,
-                ventaId, null, null, null, MSG_SIN_CAJA);
+        enrutar(idSede, TipoMovimientoCaja.INGRESO, cobrador, medioPago, monto, concepto,
+                ventaId, null, null, MSG_SIN_CAJA);
     }
 
-    public void registrarIngresoEfectivoAdministrativo(UUID gestor, String medioPago, BigDecimal monto,
+    public void registrarIngresoEfectivoAdministrativo(Long idSede, UUID gestor, String medioPago, BigDecimal monto,
                                                        String concepto, Long ventaId) {
-        enrutar(TipoMovimientoCaja.INGRESO, gestor, medioPago, monto, concepto,
-                ventaId, null, null, TipoSesionCaja.ADMINISTRATIVA, MSG_SIN_CAJA_ADMINISTRATIVA);
+        enrutar(idSede, TipoMovimientoCaja.INGRESO, gestor, medioPago, monto, concepto,
+                ventaId, null, null, MSG_SIN_CAJA);
     }
 
-    public void registrarIngresoManualEfectivo(UUID gestor, String medioPago, BigDecimal monto,
+    public void registrarIngresoManualEfectivo(Long idSede, UUID gestor, String medioPago, BigDecimal monto,
                                                String concepto, Long registroIngresoId) {
-        enrutar(TipoMovimientoCaja.INGRESO, gestor, medioPago, monto, concepto,
-                null, registroIngresoId, null,
-                TipoSesionCaja.ADMINISTRATIVA, MSG_SIN_CAJA_ADMINISTRATIVA_INGRESO);
+        enrutar(idSede, TipoMovimientoCaja.INGRESO, gestor, medioPago, monto, concepto,
+                null, registroIngresoId, null, MSG_SIN_CAJA_INGRESO);
     }
 
-    public void registrarEgresoManualEfectivo(UUID gestor, String medioPago, BigDecimal monto,
+    public void registrarEgresoManualEfectivo(Long idSede, UUID gestor, String medioPago, BigDecimal monto,
                                               String concepto, Long registroEgresoId) {
-        enrutar(TipoMovimientoCaja.EGRESO, gestor, medioPago, monto, concepto,
-                null, null, registroEgresoId,
-                TipoSesionCaja.ADMINISTRATIVA, MSG_SIN_CAJA_ADMINISTRATIVA_EGRESO);
+        enrutar(idSede, TipoMovimientoCaja.EGRESO, gestor, medioPago, monto, concepto,
+                null, null, registroEgresoId, MSG_SIN_CAJA_EGRESO);
     }
 
-    private void enrutar(TipoMovimientoCaja tipo, UUID usuario, String medioPago, BigDecimal monto,
+    private void enrutar(Long idSede, TipoMovimientoCaja tipo, UUID usuario, String medioPago, BigDecimal monto,
                          String concepto, Long ventaId, Long registroIngresoId, Long registroEgresoId,
-                         TipoSesionCaja tipoRequerido, String mensajeSinSesion) {
+                         String mensajeSinSesion) {
         if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
         if (!MEDIO_EFECTIVO.equals(medioPago)) {
             return;
         }
-        if (usuario == null) {
+        if (usuario == null || idSede == null) {
             throw new ValidationException(mensajeSinSesion);
         }
-        SesionCaja sesion = sesionCajaRepository.findAbiertaByUsuario(usuario)
+        SesionCaja sesion = sesionCajaRepository.findAbiertaBySede(idSede)
                 .orElseThrow(() -> new ValidationException(mensajeSinSesion));
-        if (tipoRequerido != null && sesion.getTipo() != tipoRequerido) {
-            throw new ValidationException(mensajeSinSesion);
-        }
         movimientoCajaRepository.save(MovimientoCaja.builder()
                 .idSesionCaja(sesion.getId())
                 .tipo(tipo)

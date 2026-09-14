@@ -168,7 +168,7 @@ public class EventoPrivadoCicloVidaService
         Venta ventaAdelanto = null;
         if (adelanto.compareTo(BigDecimal.ZERO) > 0 && !command.getPagosAdelanto().isEmpty()) {
             ventaAdelanto = ventaWriter.crearVenta(guardado, "ADELANTO_EVENTO", adelanto, command.getIdUsuarioGestor());
-            ventaWriter.registrarPagos(ventaAdelanto.getId(), command.getPagosAdelanto(), command.getIdUsuarioGestor());
+            ventaWriter.registrarPagos(guardado.getIdSede(), ventaAdelanto.getId(), command.getPagosAdelanto(), command.getIdUsuarioGestor());
         }
 
         if ("CUOTAS".equals(modalidad)) {

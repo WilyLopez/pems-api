@@ -158,7 +158,7 @@ public class VentaService implements ProcesarVentaUseCase, ConsultarVentasUseCas
                     .validadoAt(OffsetDateTime.now())
                     .build());
             enrutadorCajaService.registrarIngresoEfectivo(
-                    command.getCreatedBy(), pagoCmd.getMedioPago(), pagoCmd.getMonto(),
+                    ventaGuardada.getIdSede(), command.getCreatedBy(), pagoCmd.getMedioPago(), pagoCmd.getMonto(),
                     "Cobro reserva venta #" + ventaGuardada.getId(), ventaGuardada.getId());
         }
 

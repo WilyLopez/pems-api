@@ -58,7 +58,7 @@ public class IngresoService implements RegistrarIngresoUseCase {
                 .build();
         RegistroIngresoQuery resultado = toQuery(registroIngresoRepository.save(ingreso));
         enrutadorCajaService.registrarIngresoManualEfectivo(
-                command.getIdUsuarioRegistra(), command.getMedioPago(), command.getMonto(),
+                command.getIdSede(), command.getIdUsuarioRegistra(), command.getMedioPago(), command.getMonto(),
                 "Ingreso manual " + tipo.getNombre() + " #" + resultado.getId(), resultado.getId());
         auditoria.ejecutar(new RegistrarLogUseCase.Command(
                 command.getIdUsuarioRegistra(), AuditoriaConstants.ACCION_CREAR, AuditoriaConstants.MOD_FINANZAS,

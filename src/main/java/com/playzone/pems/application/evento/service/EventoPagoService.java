@@ -68,7 +68,7 @@ public class EventoPagoService implements RegistrarSaldoUseCase, RegistrarPagoCu
         sedeScope.validarAcceso(evento.getIdSede());
 
         Venta ventaSaldo = ventaWriter.crearVenta(evento, "SALDO_EVENTO", totalPago, command.getIdUsuario());
-        ventaWriter.registrarPagos(ventaSaldo.getId(), command.getPagos(), command.getIdUsuario());
+        ventaWriter.registrarPagos(evento.getIdSede(), ventaSaldo.getId(), command.getPagos(), command.getIdUsuario());
 
         cuotaRepository.save(cuota.toBuilder()
                 .estado(EstadoCuota.PAGADO)
@@ -115,7 +115,7 @@ public class EventoPagoService implements RegistrarSaldoUseCase, RegistrarPagoCu
                 .validadoAt(OffsetDateTime.now())
                 .build());
         enrutadorCajaService.registrarIngresoEfectivoAdministrativo(
-                command.getIdUsuario(), command.getMedioPago(), command.getMonto(),
+                evento.getIdSede(), command.getIdUsuario(), command.getMedioPago(), command.getMonto(),
                 "Saldo evento #" + evento.getId(), ventaSaldo.getId());
 
         BigDecimal nuevoAdelanto = evento.getMontoAdelanto().add(command.getMonto());

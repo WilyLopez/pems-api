@@ -240,7 +240,7 @@ public class VentaMostradorService {
 
         for (VentaPago pago : pagosGuardados) {
             enrutadorCajaService.registrarIngresoEfectivo(
-                    usuarioActual, pago.getMedioPagoCodigo(), pago.getMonto(),
+                    ventaGuardada.getIdSede(), usuarioActual, pago.getMedioPagoCodigo(), pago.getMonto(),
                     "Venta mostrador #" + ventaGuardada.getId(), ventaGuardada.getId());
         }
 
